@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "896332532787",
+    "project_id": "manadelivery-bellampally-87a53",
+    "storage_bucket": "manadelivery-bellampally-87a53.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:896332532787:android:a784373c76213c5924e746",
+        "android_client_info": {
+          "package_name": "com.example.manadeliverybellempally"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNEysXIDU6imHXE0MKAsNVi4h7Ae0Dv9c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

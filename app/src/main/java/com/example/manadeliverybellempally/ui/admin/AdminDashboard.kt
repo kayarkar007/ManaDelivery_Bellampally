@@ -67,6 +67,7 @@ fun AdminDashboardScreen(
                     0 -> AdminStatsTab(revenue, orders.size, pendingCount, activeRiders, onOrdersClick, orders)
                     1 -> AdminOrdersTab(orders, onOrdersClick)
                     2 -> AdminSystemTab(onUsersClick, onVendorsClick, onSettingsClick, onBroadcastClick, onSupportClick)
+                    3 -> AdminMarketingTab(viewModel)
                 }
             }
         }
@@ -222,6 +223,7 @@ private fun AdminBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
         NavigationBarItem(selected = selectedTab == 0, onClick = { onTabSelected(0) }, icon = { Icon(Icons.Rounded.Dashboard, null) }, label = { Text("Stats") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = ManaGold, indicatorColor = ManaRedStrong.copy(alpha = 0.2f)))
         NavigationBarItem(selected = selectedTab == 1, onClick = { onTabSelected(1) }, icon = { Icon(Icons.AutoMirrored.Rounded.ListAlt, null) }, label = { Text("Orders") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = ManaGold, indicatorColor = ManaRedStrong.copy(alpha = 0.2f)))
         NavigationBarItem(selected = selectedTab == 2, onClick = { onTabSelected(2) }, icon = { Icon(Icons.Rounded.Settings, null) }, label = { Text("System") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = ManaGold, indicatorColor = ManaRedStrong.copy(alpha = 0.2f)))
+        NavigationBarItem(selected = selectedTab == 3, onClick = { onTabSelected(3) }, icon = { Icon(Icons.Rounded.Notifications, null) }, label = { Text("Marketing") }, colors = NavigationBarItemDefaults.colors(selectedIconColor = ManaGold, indicatorColor = ManaRedStrong.copy(alpha = 0.2f)))
     }
 }
 
@@ -240,6 +242,92 @@ private fun AdminShimmerLoading(padding: PaddingValues) {
         Spacer(Modifier.height(24.dp))
         repeat(4) {
             ShimmerBox(modifier = Modifier.fillMaxWidth().height(70.dp).padding(vertical = 4.dp), shape = RoundedCornerShape(16.dp))
+        }
+    }
+}
+
+@Composable
+fun AdminMarketingTab(viewModel: AdminViewModel) {
+    var promoTitle by remember { mutableStateOf("") }
+    var promoMsg by remember { mutableStateOf("") }
+    var couponCode by remember { mutableStateOf("") }
+    var discountValue by remember { mutableStateOf("") }
+
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Text("PUSH NOTIFICATIONS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+            ManaCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    OutlinedTextField(
+                        value = promoTitle, onValueChange = { promoTitle = it },
+                        label = { Text("Notification Title", color = ManaTextSecondary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold, focusedLabelColor = ManaGold, unfocusedTextColor = ManaTextPrimary, focusedTextColor = ManaTextPrimary)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = promoMsg, onValueChange = { promoMsg = it },
+                        label = { Text("Notification Message", color = ManaTextSecondary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold, focusedLabelColor = ManaGold, unfocusedTextColor = ManaTextPrimary, focusedTextColor = ManaTextPrimary)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            viewModel.sendPromoNotification(promoTitle, promoMsg)
+                            promoTitle = ""
+                            promoMsg = ""
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("BROADCAST TO ALL USERS", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        item {
+            Text("COUPONS & OFFERS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+            ManaCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    OutlinedTextField(
+                        value = couponCode, onValueChange = { couponCode = it.uppercase() },
+                        label = { Text("Coupon Code (e.g. MANA50)", color = ManaTextSecondary) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold, focusedLabelColor = ManaGold, unfocusedTextColor = ManaTextPrimary, focusedTextColor = ManaTextPrimary)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = discountValue, onValueChange = { discountValue = it },
+                        label = { Text("Discount Value (%)", color = ManaTextSecondary) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold, focusedLabelColor = ManaGold, unfocusedTextColor = ManaTextPrimary, focusedTextColor = ManaTextPrimary)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val v = discountValue.toDoubleOrNull() ?: 0.0
+                            val c = com.example.manadeliverybellempally.data.model.Coupon(
+                                code = couponCode,
+                                description = "$discountValue% OFF",
+                                discountType = "PERCENTAGE",
+                                discountValue = v,
+                                isActive = true
+                            )
+                            viewModel.saveCoupon(c)
+                            couponCode = ""
+                            discountValue = ""
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("CREATE COUPON", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }

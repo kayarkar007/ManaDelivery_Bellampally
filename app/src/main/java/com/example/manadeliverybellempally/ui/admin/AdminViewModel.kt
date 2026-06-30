@@ -132,6 +132,12 @@ class AdminViewModel(private val repository: FirestoreRepository = FirestoreRepo
         }
     }
 
+    fun sendPromoNotification(title: String, message: String) {
+        viewModelScope.launch {
+            repository.sendMockPushNotification(title, message)
+        }
+    }
+
     fun saveBanner(banner: Banner) {
         viewModelScope.launch {
             repository.saveBanner(banner)

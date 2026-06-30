@@ -798,6 +798,34 @@ class FirestoreRepository {
         }
     }
 
+    fun getActiveCouponsFlow(): kotlinx.coroutines.flow.Flow<List<Coupon>> = kotlinx.coroutines.flow.callbackFlow {
+        val listener = db.collection("coupons")
+            .whereEqualTo("isActive", true)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                trySend(snapshot?.toObjects(Coupon::class.java).orEmpty())
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun sendMockPushNotification(title: String, message: String): Result<Unit> {
+        return try {
+            val notif = mapOf(
+                "title" to title,
+                "message" to message,
+                "type" to "PROMO",
+                "timestamp" to System.currentTimeMillis()
+            )
+            db.collection("promo_notifications").add(notif).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // ═══════════════════════════════════════════
     // REORDER — Fetch original order items
     // ═══════════════════════════════════════════

@@ -28,6 +28,9 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
     private val _orders = MutableStateFlow<List<Order>>(emptyList())
     val orders: StateFlow<List<Order>> = _orders
 
+    private val _activePromos = MutableStateFlow<List<Coupon>>(emptyList())
+    val activePromos: StateFlow<List<Coupon>> = _activePromos
+
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser
 
@@ -84,6 +87,7 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
                 launch { repository.getProductsFlow().collect { _products.value = it } }
                 launch { repository.getOrdersForCustomerFlow(customerId).collect { _orders.value = it } }
                 launch { repository.getUserFlow(customerId).collect { _currentUser.value = it } }
+                launch { repository.getActiveCouponsFlow().collect { _activePromos.value = it } }
                 
                 delay(800) // Small delay for smooth shimmer transition
             } catch (e: Exception) {

@@ -44,6 +44,7 @@ fun CustomerHomeScreen(
     val vendors by viewModel.vendors.collectAsState()
     val products by viewModel.products.collectAsState()
     val cart by viewModel.cart.collectAsState()
+    val promos by viewModel.activePromos.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
     var showAddressPicker by remember { mutableStateOf(false) }
@@ -84,6 +85,12 @@ fun CustomerHomeScreen(
             ) {
                 item {
                     HeroBanner()
+                }
+
+                if (promos.isNotEmpty()) {
+                    item {
+                        PromoCarousel(promos)
+                    }
                 }
 
                 item {
@@ -185,12 +192,68 @@ fun QuickActions(onOrdersClick: () -> Unit, onWalletClick: () -> Unit) {
 
 @Composable
 fun HomeShimmerLoading(padding: PaddingValues) {
-    Column(modifier = Modifier.padding(padding).padding(16.dp)) {
-        ShimmerBox(Modifier.fillMaxWidth().height(180.dp), RoundedCornerShape(24.dp))
+    Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+        ShimmerBox(modifier = Modifier.fillMaxWidth().height(160.dp), shape = RoundedCornerShape(24.dp))
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            ShimmerBox(Modifier.weight(1f).height(100.dp), RoundedCornerShape(24.dp))
-            ShimmerBox(Modifier.weight(1f).height(100.dp), RoundedCornerShape(24.dp))
+            ShimmerBox(modifier = Modifier.weight(1f).height(100.dp), shape = RoundedCornerShape(20.dp))
+            ShimmerBox(modifier = Modifier.weight(1f).height(100.dp), shape = RoundedCornerShape(20.dp))
+        }
+        Spacer(Modifier.height(32.dp))
+        ShimmerBox(modifier = Modifier.width(150.dp).height(24.dp), shape = RoundedCornerShape(4.dp))
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            repeat(4) {
+                ShimmerBox(modifier = Modifier.size(80.dp), shape = RoundedCornerShape(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun PromoCarousel(promos: List<Coupon>) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+        Text("ACTIVE OFFERS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp, modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(Modifier.height(12.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(promos) { promo ->
+                Box(
+                    modifier = Modifier
+                        .width(280.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(ManaGold, ManaRedStrong),
+                                start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                                end = androidx.compose.ui.geometry.Offset(1000f, 1000f)
+                            )
+                        )
+                        .padding(2.dp)
+                ) {
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(ManaBgPrimary)
+                        .padding(16.dp)
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.LocalOffer, contentDescription = null, tint = ManaGold, modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(promo.description, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = ManaTextPrimary)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text("Use code: ${promo.code}", style = MaterialTheme.typography.bodyMedium, color = ManaGold, fontWeight = FontWeight.Bold)
+                            if (promo.minOrderAmount > 0) {
+                                Text("Min order: ₹${promo.minOrderAmount}", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

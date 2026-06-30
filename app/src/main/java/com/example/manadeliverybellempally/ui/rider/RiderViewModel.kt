@@ -74,6 +74,17 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
         }
     }
 
+    // Phase 9: Real-time Location Updates
+    fun updateLocation(lat: Double, lng: Double) {
+        viewModelScope.launch {
+            // Update location for all active orders for this rider
+            val activeOrders = _myOrders.value.filter { it.status == "OUT_FOR_DELIVERY" || it.status == "ACCEPTED" || it.status == "READY" }
+            activeOrders.forEach { order ->
+                repository.updateOrderRiderLocation(order.id, lat, lng)
+            }
+        }
+    }
+
     fun clearError() {
         _error.value = null
     }

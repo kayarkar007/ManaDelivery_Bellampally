@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 import com.example.manadeliverybellempally.data.model.*
 import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
@@ -41,6 +43,22 @@ fun RiderDashboardScreen(
 
     LaunchedEffect(riderId) {
         viewModel.initialize(riderId)
+    }
+
+    // Phase 9: Real-time Location Simulation
+    LaunchedEffect(myDeliveries) {
+        val hasActiveDeliveries = myDeliveries.any { it.status == "OUT_FOR_DELIVERY" || it.status == "ACCEPTED" || it.status == "READY" }
+        if (hasActiveDeliveries) {
+            var currentLat = 19.0560
+            var currentLng = 79.4851
+            while (true) {
+                // Simulate movement
+                currentLat += Random.nextDouble(-0.0005, 0.0005)
+                currentLng += Random.nextDouble(-0.0005, 0.0005)
+                viewModel.updateLocation(currentLat, currentLng)
+                delay(5000) // Update every 5 seconds
+            }
+        }
     }
 
     Scaffold(

@@ -111,4 +111,9 @@ dependencies {
   implementation(libs.firebase.appcheck.playintegrity)
   implementation("com.google.firebase:firebase-appcheck-debug:18.0.0")
   implementation(libs.play.integrity)
+
+  // Maps & Location
+  implementation(libs.maps.compose)
+  implementation(libs.play.services.maps)
+  implementation(libs.play.services.location)
 }

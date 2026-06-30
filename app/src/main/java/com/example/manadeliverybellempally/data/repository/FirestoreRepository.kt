@@ -342,6 +342,20 @@ class FirestoreRepository {
         awaitClose { listener.remove() }
     }
 
+    suspend fun updateOrderRiderLocation(orderId: String, lat: Double, lng: Double): Result<Unit> {
+        return try {
+            db.collection("orders").document(orderId).update(
+                mapOf(
+                    "riderLocationLat" to lat,
+                    "riderLocationLng" to lng
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun assignRiderToOrder(orderId: String, riderId: String, riderName: String, riderPhone: String): Result<Unit> {
         return try {
             val orderRef = db.collection("orders").document(orderId)

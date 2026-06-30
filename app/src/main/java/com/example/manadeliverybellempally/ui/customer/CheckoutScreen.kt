@@ -21,6 +21,11 @@ import com.example.manadeliverybellempally.ui.common.*
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
+import com.example.manadeliverybellempally.MainActivity
+import com.razorpay.Checkout
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +36,7 @@ fun CheckoutScreen(
 ) {
     val cart by viewModel.cart.collectAsState()
     val products by viewModel.products.collectAsState()
+    val activity = LocalContext.current as Activity
     val subtotal = viewModel.getCartSubtotal()
     val deliveryFee = viewModel.getDeliveryFee()
     val discount = viewModel.getDiscountAmount()
@@ -51,7 +57,6 @@ fun CheckoutScreen(
     var showSavedAddresses by remember { mutableStateOf(false) }
     
     var selectedPaymentMethod by remember { mutableStateOf("UPI") }
-    var showMockPaymentGateway by remember { mutableStateOf(false) }
     
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -90,10 +95,35 @@ fun CheckoutScreen(
                 ManaGradientButton(
                     text = if (isLoading) "PLACING ORDER..." else "PAY ₹${total.toInt()} & PLACE ORDER",
                     onClick = {
-                        if (selectedPaymentMethod == "UPI") {
-                            showMockPaymentGateway = true
-                        } else {
-                            viewModel.placeOrder("COD", address + (if (landmark.isNotEmpty()) ", Landmark: $landmark" else ""))
+                        val fullAddress = address + (if (landmark.isNotEmpty()) ", Landmark: $landmark" else "")
+                        viewModel.placeOrder(selectedPaymentMethod, fullAddress) { order ->
+                            if (selectedPaymentMethod == "UPI") {
+                                MainActivity.paymentCallback = { success, paymentId ->
+                                    if (success && paymentId != null) {
+                                        viewModel.handlePaymentSuccess(order.id, paymentId)
+                                    } else {
+                                        viewModel.handlePaymentFailure(order.id)
+                                    }
+                                }
+                                
+                                val checkout = Checkout()
+                                // For production, replace with real Razorpay key
+                                checkout.setKeyID("YOUR_RAZORPAY_API_KEY") 
+                                try {
+                                    val options = JSONObject()
+                                    options.put("name", "Mana Delivery")
+                                    options.put("description", "Order Checkout")
+                                    // Convert amount to paise (multiply by 100)
+                                    options.put("amount", (order.total * 100).toInt()) 
+                                    options.put("currency", "INR")
+                                    options.put("prefill.contact", order.userPhone)
+                                    options.put("prefill.email", "customer@manadelivery.com")
+                                    
+                                    checkout.open(activity, options)
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
                         }
                     },
                     icon = Icons.Rounded.CheckCircle,
@@ -106,33 +136,6 @@ fun CheckoutScreen(
         containerColor = ManaBgPrimary
     ) { padding ->
         
-        if (showMockPaymentGateway) {
-            AlertDialog(
-                onDismissRequest = { showMockPaymentGateway = false },
-                title = { Text("Mock Razorpay PG", fontWeight = FontWeight.Bold, color = ManaTextPrimary) },
-                text = { Text("Simulate a successful UPI payment of ₹${total.toInt()}?", color = ManaTextSecondary) },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showMockPaymentGateway = false
-                            viewModel.placeOrder("UPI", address + (if (landmark.isNotEmpty()) ", Landmark: $landmark" else ""))
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ManaGold)
-                    ) {
-                        Text("Pay Success")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { 
-                        showMockPaymentGateway = false
-                        scope.launch { snackbarHostState.showSnackbar("Payment Failed") }
-                    }) {
-                        Text("Simulate Failure", color = ManaRedStrong)
-                    }
-                },
-                containerColor = ManaBgCard
-            )
-        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

@@ -412,6 +412,22 @@ class FirestoreRepository {
         }
     }
 
+    suspend fun updatePaymentStatus(orderId: String, paymentId: String, status: String): Result<Unit> {
+        return try {
+            db.collection("orders").document(orderId)
+                .update(
+                    mapOf(
+                        "paymentStatus" to status,
+                        "paymentId" to paymentId,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun rejectOrder(orderId: String, reason: String): Result<Unit> {
         return try {
             db.collection("orders").document(orderId)

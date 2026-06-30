@@ -16,8 +16,15 @@ import androidx.core.content.ContextCompat
 import com.example.manadeliverybellempally.theme.ManaDeliveryBellempallyTheme
 import com.example.manadeliverybellempally.theme.ManaBgPrimary
 import com.google.firebase.messaging.FirebaseMessaging
+import com.razorpay.Checkout
+import com.razorpay.PaymentData
+import com.razorpay.PaymentResultWithDataListener
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), PaymentResultWithDataListener {
+
+    companion object {
+        var paymentCallback: ((Boolean, String?) -> Unit)? = null
+    }
 
     @android.annotation.SuppressLint("InvalidFragmentVersionForActivityResult")
     private val requestPermissionLauncher = registerForActivityResult(
@@ -30,6 +37,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        Checkout.preload(applicationContext)
 
         // Firebase + App Check are already initialized in ManaDeliveryApp.
         // No need to duplicate here — saves ~200ms on Activity launch.
@@ -66,5 +75,17 @@ class MainActivity : ComponentActivity() {
             val token = task.result
             Log.d("FCM", "Token: $token")
         }
+    }
+
+    override fun onPaymentSuccess(paymentId: String?, paymentData: PaymentData?) {
+        Log.d("Razorpay", "Payment Success: $paymentId")
+        paymentCallback?.invoke(true, paymentId)
+        paymentCallback = null
+    }
+
+    override fun onPaymentError(code: Int, response: String?, paymentData: PaymentData?) {
+        Log.e("Razorpay", "Payment Error $code: $response")
+        paymentCallback?.invoke(false, null)
+        paymentCallback = null
     }
 }

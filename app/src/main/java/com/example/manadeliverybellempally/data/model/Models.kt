@@ -81,6 +81,7 @@ data class Order(
     val deliveryStatus: String = "PENDING",
     val paymentMethod: String = "COD",
     val paymentStatus: String = "PENDING", // PENDING, PAID, FAILED
+    val paymentId: String = "", // Razorpay Transaction ID
     val riderLocationLat: Double = 0.0,
     val riderLocationLng: Double = 0.0,
     val subtotal: Double = 0.0,

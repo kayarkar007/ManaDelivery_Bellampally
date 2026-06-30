@@ -212,7 +212,7 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
         _orderSuccess.value = false
     }
 
-    fun placeOrder(paymentMethod: String, address: String) {
+    fun placeOrder(paymentMethod: String, address: String, onOrderCreated: ((Order) -> Unit)? = null) {
         // ── Input Validation ──
         if (_cart.value.isEmpty()) {
             _orderError.value = "Cart is empty. Add items first."
@@ -277,13 +277,37 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
             )
             val result = repository.createOrder(order)
             if (result.isSuccess) {
-                clearCart()
-                _orderSuccess.value = true
-                _appliedCoupon.value = null
+                if (paymentMethod == "UPI") {
+                    // Hand control over to UI/Activity to start Razorpay
+                    onOrderCreated?.invoke(order)
+                } else {
+                    // COD flow finishes here
+                    clearCart()
+                    _orderSuccess.value = true
+                    _appliedCoupon.value = null
+                }
             } else {
                 _orderError.value = result.exceptionOrNull()?.message ?: "Order failed. Please try again."
             }
             _isLoading.value = false
+        }
+    }
+
+    fun handlePaymentSuccess(orderId: String, paymentId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.updatePaymentStatus(orderId, paymentId, "PAID")
+            clearCart()
+            _orderSuccess.value = true
+            _appliedCoupon.value = null
+            _isLoading.value = false
+        }
+    }
+
+    fun handlePaymentFailure(orderId: String) {
+        viewModelScope.launch {
+            repository.updatePaymentStatus(orderId, "", "FAILED")
+            _orderError.value = "Payment failed. Try COD or pay later."
         }
     }
 

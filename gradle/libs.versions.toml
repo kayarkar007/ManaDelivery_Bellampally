@@ -20,6 +20,7 @@ material-icons = "1.7.8"
 mapsCompose = "4.3.3"
 playServicesMaps = "18.2.0"
 playServicesLocation = "21.2.0"
+razorpay = "1.6.38"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -58,6 +59,7 @@ play-integrity = { module = "com.google.android.play:integrity" }
 maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
 play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "playServicesMaps" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+razorpay-checkout = { module = "com.razorpay:checkout", version.ref = "razorpay" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

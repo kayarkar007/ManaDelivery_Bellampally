@@ -884,4 +884,22 @@ class FirestoreRepository {
             }
         awaitClose { listener.remove() }
     }
+
+    // ═══════════════════════════════════════════
+    // PHASE 7: REVIEWS & RATINGS
+    // ═══════════════════════════════════════════
+
+    fun getVendorReviewsFlow(vendorId: String): Flow<List<Review>> = callbackFlow {
+        val listener = db.collection("reviews")
+            .whereEqualTo("vendorId", vendorId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val reviews = snapshot?.toObjects(Review::class.java).orEmpty().sortedByDescending { it.createdAt }
+                trySend(reviews)
+            }
+        awaitClose { listener.remove() }
+    }
 }

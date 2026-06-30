@@ -58,6 +58,7 @@ fun VendorDashboardScreen(
                     0 -> VendorHomeTab(vendor, viewModel, orders)
                     1 -> VendorOrdersTab(orders, viewModel)
                     2 -> VendorMenuTab(products, viewModel)
+                    3 -> VendorReviewsTab(vendor, viewModel)
                 }
             }
         }
@@ -224,5 +225,64 @@ private fun VendorBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
         NavigationBarItem(selected = selectedTab == 0, onClick = { onTabSelected(0) }, icon = { Icon(Icons.Rounded.Dashboard, null) }, label = { Text("Home") })
         NavigationBarItem(selected = selectedTab == 1, onClick = { onTabSelected(1) }, icon = { Icon(Icons.Rounded.ShoppingBag, null) }, label = { Text("Orders") })
         NavigationBarItem(selected = selectedTab == 2, onClick = { onTabSelected(2) }, icon = { Icon(Icons.Rounded.RestaurantMenu, null) }, label = { Text("Menu") })
+        NavigationBarItem(selected = selectedTab == 3, onClick = { onTabSelected(3) }, icon = { Icon(Icons.Rounded.Star, null) }, label = { Text("Reviews") })
+    }
+}
+
+@Composable
+fun VendorReviewsTab(vendor: Vendor?, viewModel: VendorViewModel) {
+    val reviews by viewModel.reviews.collectAsState()
+
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Text("PERFORMANCE", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+            Spacer(Modifier.height(8.dp))
+            ManaCard(modifier = Modifier.fillMaxWidth()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(String.format("%.1f", vendor?.rating ?: 5.0), style = MaterialTheme.typography.displayLarge, color = ManaGold, fontWeight = FontWeight.Black)
+                    Row(horizontalArrangement = Arrangement.Center) {
+                        repeat(5) { i ->
+                            Icon(
+                                imageVector = if (i < (vendor?.rating?.toInt() ?: 5)) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                                contentDescription = null,
+                                tint = ManaGold,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Based on ${vendor?.ratingCount ?: 0} reviews", style = MaterialTheme.typography.bodyMedium, color = ManaTextSecondary)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("CUSTOMER REVIEWS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+        }
+        
+        if (reviews.isEmpty()) {
+            item {
+                EmptyState(icon = Icons.Rounded.StarBorder, title = "No reviews yet", subtitle = "Deliver great food to earn 5-star ratings!")
+            }
+        } else {
+            items(reviews) { review ->
+                ManaCard(modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text(review.userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = ManaTextPrimary)
+                            Row {
+                                Icon(Icons.Rounded.Star, null, tint = ManaGold, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(review.rating.toString(), style = MaterialTheme.typography.bodyMedium, color = ManaGold, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (review.comment.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("\"${review.comment}\"", style = MaterialTheme.typography.bodyMedium, color = ManaTextSecondary, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("Order #${review.orderId.takeLast(6).uppercase()}", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                    }
+                }
+            }
+        }
     }
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.manadeliverybellempally.data.model.Order
 import com.example.manadeliverybellempally.data.model.Product
+import com.example.manadeliverybellempally.data.model.Review
 import com.example.manadeliverybellempally.data.model.Vendor
 import com.example.manadeliverybellempally.data.repository.FirestoreRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,9 @@ class VendorViewModel(private val repository: FirestoreRepository = FirestoreRep
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
+    private val _reviews = MutableStateFlow<List<Review>>(emptyList())
+    val reviews: StateFlow<List<Review>> = _reviews
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
@@ -35,6 +39,11 @@ class VendorViewModel(private val repository: FirestoreRepository = FirestoreRep
             launch {
                 repository.getVendorOrdersFlow(vendorId).collect {
                     _orders.value = it
+                }
+            }
+            launch {
+                repository.getVendorReviewsFlow(vendorId).collect {
+                    _reviews.value = it
                 }
             }
             _isLoading.value = false

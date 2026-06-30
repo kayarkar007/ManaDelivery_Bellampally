@@ -15,6 +15,12 @@ class AdminViewModel(private val repository: FirestoreRepository = FirestoreRepo
     private val _revenue = MutableStateFlow(0.0)
     val revenue: StateFlow<Double> = _revenue
 
+    private val _todayRevenue = MutableStateFlow(0.0)
+    val todayRevenue: StateFlow<Double> = _todayRevenue
+
+    private val _todayOrderCount = MutableStateFlow(0)
+    val todayOrderCount: StateFlow<Int> = _todayOrderCount
+
     private val _orderCount = MutableStateFlow(0)
     val orderCount: StateFlow<Int> = _orderCount
 
@@ -26,6 +32,14 @@ class AdminViewModel(private val repository: FirestoreRepository = FirestoreRepo
 
     private val _allOrders = MutableStateFlow<List<Order>>(emptyList())
     val allOrders: StateFlow<List<Order>> = _allOrders
+
+    private val _orderStatusFilter = MutableStateFlow("ALL")
+    val orderStatusFilter: StateFlow<String> = _orderStatusFilter
+
+    val filteredOrders: StateFlow<List<Order>> = combine(_allOrders, _orderStatusFilter) { orders, filter ->
+        if (filter == "ALL") orders.sortedByDescending { it.createdAt }
+        else orders.filter { it.status == filter }.sortedByDescending { it.createdAt }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _allUsers = MutableStateFlow<List<User>>(emptyList())
     val allUsers: StateFlow<List<User>> = _allUsers
@@ -63,6 +77,17 @@ class AdminViewModel(private val repository: FirestoreRepository = FirestoreRepo
                         _allOrders.value = orders
                         _orderCount.value = orders.size
                         _revenue.value = orders.filter { it.status == "DELIVERED" }.sumOf { it.total }
+                        
+                        // Today's metrics
+                        val todayStart = java.util.Calendar.getInstance().apply {
+                            set(java.util.Calendar.HOUR_OF_DAY, 0)
+                            set(java.util.Calendar.MINUTE, 0)
+                            set(java.util.Calendar.SECOND, 0)
+                            set(java.util.Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                        val todayOrders = orders.filter { it.createdAt >= todayStart }
+                        _todayOrderCount.value = todayOrders.size
+                        _todayRevenue.value = todayOrders.filter { it.status == "DELIVERED" }.sumOf { it.total }
                     }
                 }
                 // BUG-14 FIX: Single listener for users, computing ALL derived counts
@@ -151,6 +176,17 @@ class AdminViewModel(private val repository: FirestoreRepository = FirestoreRepo
             val updated = ticket.copy(status = "RESOLVED", internalNotes = internalNotes)
             repository.updateTicket(updated)
             logAudit("TICKET_RESOLVE", ticket.id, "Ticket resolved")
+        }
+    }
+
+    fun setOrderStatusFilter(filter: String) {
+        _orderStatusFilter.value = filter
+    }
+
+    fun refundOrder(order: Order) {
+        viewModelScope.launch {
+            repository.updateOrderStatus(order.id, "REFUNDED")
+            logAudit("ORDER_REFUND", order.id, "Refunded ₹${order.total.toInt()} to ${order.userName}")
         }
     }
 

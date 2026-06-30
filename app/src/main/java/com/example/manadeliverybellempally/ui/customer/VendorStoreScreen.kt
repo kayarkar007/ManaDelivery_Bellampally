@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -123,7 +124,7 @@ fun VendorStoreScreen(
             if (products.isEmpty()) {
                 item {
                     EmptyState(
-                        icon = Icons.Rounded.MenuBook,
+                        icon = Icons.AutoMirrored.Rounded.MenuBook,
                         title = "No products",
                         subtitle = "This vendor hasn't listed any items yet."
                     )
@@ -160,8 +161,8 @@ private fun VendorDetailHeader(vendor: Vendor?) {
                 ) {
                     if (!vendor?.imageUrl.isNullOrBlank()) {
                         AsyncImage(
-                            model = vendor?.imageUrl,
-                            contentDescription = vendor?.storeName,
+                            model = vendor.imageUrl,
+                            contentDescription = vendor.storeName,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )

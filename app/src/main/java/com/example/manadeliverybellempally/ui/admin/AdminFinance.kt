@@ -9,7 +9,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,13 +45,10 @@ fun AdminPayoutScreen(
         containerColor = ManaBgPrimary
     ) { padding ->
         Column(Modifier.padding(padding)) {
-            TabRow(
+            PrimaryTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = ManaBgPrimary,
-                contentColor = ManaGold,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(tabPositions[selectedTab]), color = ManaGold)
-                }
+                contentColor = ManaGold
             ) {
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Settlements") })
                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("History") })

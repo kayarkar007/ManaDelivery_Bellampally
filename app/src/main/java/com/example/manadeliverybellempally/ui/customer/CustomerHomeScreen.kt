@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ListAlt
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -478,7 +479,7 @@ fun CustomerBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
         NavigationBarItem(
             selected = selectedTab == 1,
             onClick = { onTabSelected(1) },
-            icon = { Icon(Icons.Rounded.ListAlt, null) },
+            icon = { Icon(Icons.AutoMirrored.Rounded.ListAlt, null) },
             label = { Text("Orders") },
             colors = NavigationBarItemDefaults.colors(selectedIconColor = ManaGold, indicatorColor = ManaGold.copy(alpha = 0.1f))
         )

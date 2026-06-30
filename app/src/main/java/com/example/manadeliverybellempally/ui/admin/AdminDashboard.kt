@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,11 +41,7 @@ fun AdminDashboardScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val orders by viewModel.allOrders.collectAsState()
-    val revenue by viewModel.revenue.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    
-    val pendingCount by viewModel.pendingVendorsCount.collectAsState()
-    val activeRiders by viewModel.activeRidersCount.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.initialize()
@@ -64,8 +61,8 @@ fun AdminDashboardScreen(
         } else {
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (selectedTab) {
-                    0 -> AdminStatsTab(revenue, orders.size, pendingCount, activeRiders, onOrdersClick, orders)
-                    1 -> AdminOrdersTab(orders, onOrdersClick)
+                    0 -> AdminStatsTab(viewModel = viewModel, onOrderClick = onOrdersClick, allOrders = orders)
+                    1 -> AdminOrdersTab(viewModel = viewModel, onOrderClick = onOrdersClick)
                     2 -> AdminSystemTab(onUsersClick, onVendorsClick, onSettingsClick, onBroadcastClick, onSupportClick)
                     3 -> AdminMarketingTab(viewModel)
                 }
@@ -95,20 +92,39 @@ private fun AdminTopBar(onLogout: () -> Unit) {
 }
 
 @Composable
-fun AdminStatsTab(revenue: Double, orderCount: Int, pendingVendors: Int, activeRiders: Int, onOrderClick: (String) -> Unit, allOrders: List<Order>) {
+fun AdminStatsTab(
+    viewModel: AdminViewModel,
+    onOrderClick: (String) -> Unit,
+    allOrders: List<Order>
+) {
+    val revenue by viewModel.revenue.collectAsState()
+    val todayRevenue by viewModel.todayRevenue.collectAsState()
+    val todayOrderCount by viewModel.todayOrderCount.collectAsState()
+    val pendingVendors by viewModel.pendingVendorsCount.collectAsState()
+    val activeRiders by viewModel.activeRidersCount.collectAsState()
+
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Text("PLATFORM OVERVIEW", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+            Text("TODAY'S PERFORMANCE", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(title = "Revenue", value = "₹${revenue.toInt()}", icon = Icons.Rounded.Payments, color = ManaGold, modifier = Modifier.weight(1f))
-                StatCard(title = "Orders", value = orderCount.toString(), icon = Icons.Rounded.ShoppingBasket, color = ManaSuccess, modifier = Modifier.weight(1f))
+                StatCard(title = "Today Revenue", value = "₹${todayRevenue.toInt()}", icon = Icons.Rounded.CurrencyRupee, color = ManaSuccess, modifier = Modifier.weight(1f))
+                StatCard(title = "Today Orders", value = todayOrderCount.toString(), icon = Icons.Rounded.ShoppingBasket, color = ManaGold, modifier = Modifier.weight(1f))
+            }
+        }
+        item {
+            Text("ALL-TIME STATS", style = MaterialTheme.typography.labelMedium, color = ManaTextTertiary, letterSpacing = 2.sp)
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(title = "Total Revenue", value = "₹${revenue.toInt()}", icon = Icons.Rounded.Payments, color = ManaGold, modifier = Modifier.weight(1f))
+                StatCard(title = "Total Orders", value = allOrders.size.toString(), icon = Icons.Rounded.Inventory2, color = ManaInfo, modifier = Modifier.weight(1f))
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(title = "Pending", value = pendingVendors.toString(), icon = Icons.Rounded.Store, color = ManaWarning, modifier = Modifier.weight(1f))
+                StatCard(title = "Pending Vendors", value = pendingVendors.toString(), icon = Icons.Rounded.Store, color = ManaWarning, modifier = Modifier.weight(1f))
                 StatCard(title = "Active Riders", value = activeRiders.toString(), icon = Icons.Rounded.DeliveryDining, color = ManaInfo, modifier = Modifier.weight(1f))
             }
         }
@@ -118,7 +134,7 @@ fun AdminStatsTab(revenue: Double, orderCount: Int, pendingVendors: Int, activeR
             Text("RECENT LIVE ORDERS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
         }
         
-        val recentOrders = allOrders.take(3)
+        val recentOrders = allOrders.sortedByDescending { it.createdAt }.take(5)
         if (recentOrders.isEmpty()) {
             item {
                 ManaCard {
@@ -126,16 +142,25 @@ fun AdminStatsTab(revenue: Double, orderCount: Int, pendingVendors: Int, activeR
                 }
             }
         } else {
-            items(recentOrders) { order ->
+            items(recentOrders, key = { it.id }) { order ->
                 ManaCard(onClick = { onOrderClick(order.id) }, border = BorderStroke(1.dp, ManaBorder)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if(order.status == "PLACED") ManaWarning else ManaSuccess))
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(
+                            when (order.status) {
+                                "PLACED" -> ManaWarning
+                                "PREPARING" -> ManaInfo
+                                "READY" -> ManaGold
+                                "PICKED_UP" -> ManaSuccess
+                                "DELIVERED" -> ManaSuccess
+                                else -> ManaRed
+                            }
+                        ))
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Order #${order.id.takeLast(6).uppercase()}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(order.vendorName, style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                            Text("${order.vendorName} • ₹${order.total.toInt()}", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
                         }
-                        Text(order.status, style = MaterialTheme.typography.labelSmall, color = ManaGold, fontWeight = FontWeight.Bold)
+                        OrderStatusChip(order.status)
                     }
                 }
             }
@@ -146,29 +171,104 @@ fun AdminStatsTab(revenue: Double, orderCount: Int, pendingVendors: Int, activeR
 }
 
 @Composable
-fun AdminOrdersTab(orders: List<Order>, onOrderClick: (String) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("ALL ORDERS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+fun AdminOrdersTab(viewModel: AdminViewModel, onOrderClick: (String) -> Unit) {
+    val filteredOrders by viewModel.filteredOrders.collectAsState()
+    val currentFilter by viewModel.orderStatusFilter.collectAsState()
+    val statusOptions = listOf("ALL", "PLACED", "PREPARING", "READY", "PICKED_UP", "DELIVERED", "CANCELLED")
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Status Filter Chips
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(statusOptions) { status ->
+                FilterChip(
+                    selected = currentFilter == status,
+                    onClick = { viewModel.setOrderStatusFilter(status) },
+                    label = {
+                        Text(
+                            if (status == "ALL") "All" else status.replace("_", " ").lowercase()
+                                .replaceFirstChar { it.uppercase() },
+                            fontWeight = if (currentFilter == status) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 12.sp
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ManaGold,
+                        selectedLabelColor = Color.Black,
+                        containerColor = ManaBgCard,
+                        labelColor = ManaTextSecondary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = ManaBorder,
+                        selectedBorderColor = ManaGold,
+                        enabled = true,
+                        selected = currentFilter == status
+                    )
+                )
+            }
         }
-        items(orders) { order ->
-            ManaCard(onClick = { onOrderClick(order.id) }) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Order #${order.id.takeLast(6).uppercase()}", fontWeight = FontWeight.Bold, color = ManaTextPrimary)
-                        Text(order.userName, style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
-                        Spacer(Modifier.height(4.dp))
-                        Text(order.vendorName, style = MaterialTheme.typography.bodySmall, color = ManaGold)
+
+        // Orders Count
+        Text(
+            "${filteredOrders.size} orders",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = ManaTextTertiary
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { Spacer(Modifier.height(4.dp)) }
+            items(filteredOrders, key = { it.id }) { order ->
+                val dateFormat = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.getDefault())
+                val dateStr = dateFormat.format(java.util.Date(order.createdAt))
+
+                ManaCard(onClick = { onOrderClick(order.id) }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Order #${order.id.takeLast(6).uppercase()}", fontWeight = FontWeight.Bold, color = ManaTextPrimary)
+                            Text(order.userName, style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                            Spacer(Modifier.height(4.dp))
+                            Text(order.vendorName, style = MaterialTheme.typography.bodySmall, color = ManaGold)
+                            Text("${order.items.size} items • $dateStr", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            OrderStatusChip(order.status)
+                            Spacer(Modifier.height(4.dp))
+                            Text("₹${order.total.toInt()}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+                        }
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        OrderStatusChip(order.status)
-                        Spacer(Modifier.height(4.dp))
-                        Text("₹${order.total.toInt()}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Black)
+
+                    // Refund button for delivered orders
+                    if (order.status == "DELIVERED" || order.status == "CANCELLED") {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider(color = ManaBorder.copy(alpha = 0.3f))
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = { viewModel.refundOrder(order) },
+                                colors = ButtonDefaults.textButtonColors(contentColor = ManaRed)
+                            ) {
+                                Icon(Icons.Rounded.CurrencyRupee, null, modifier = Modifier.size(16.dp))
+                                Text("REFUND", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }
+            item { Spacer(Modifier.height(32.dp)) }
         }
-        item { Spacer(Modifier.height(32.dp)) }
     }
 }
 

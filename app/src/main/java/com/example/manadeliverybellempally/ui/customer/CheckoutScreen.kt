@@ -269,7 +269,7 @@ fun CheckoutScreen(
                             }
                         }
 
-                        Divider(color = ManaBorder)
+                        HorizontalDivider(color = ManaBorder)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -310,7 +310,7 @@ fun CheckoutScreen(
                         }
                         
                         if (showSavedAddresses && hasSavedAddresses) {
-                            Divider(Modifier.padding(vertical = 12.dp), color = ManaBorder)
+                            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ManaBorder)
                             currentUser?.savedAddresses?.forEach { saved ->
                                 Row(
                                     modifier = Modifier

@@ -27,6 +27,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object Checkout : NavKey
 @Serializable data object CustomerOrders : NavKey
 @Serializable data class OrderTracking(val orderId: String) : NavKey
+@Serializable data class CustomerSupport(val orderId: String? = null) : NavKey
 @Serializable data object OrderHistory : NavKey
 @Serializable data object WalletScreen : NavKey
 @Serializable data object ProfileScreen : NavKey

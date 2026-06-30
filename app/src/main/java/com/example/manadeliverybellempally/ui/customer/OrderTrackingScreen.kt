@@ -30,7 +30,8 @@ import com.example.manadeliverybellempally.data.model.Order
 fun OrderTrackingScreen(
     orderId: String,
     viewModel: CustomerViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSupportClick: (String) -> Unit = {}
 ) {
     val orders by viewModel.orders.collectAsState()
     val order = orders.find { it.id == orderId }
@@ -278,6 +279,21 @@ fun OrderTrackingScreen(
                                     Text("Submit Review")
                                 }
                             }
+                        }
+                    }
+
+                    item { Spacer(Modifier.height(16.dp)) }
+
+                    item {
+                        OutlinedButton(
+                            onClick = { onSupportClick(order.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ManaRed),
+                            border = BorderStroke(1.dp, ManaRed.copy(alpha = 0.5f))
+                        ) {
+                            Icon(Icons.Rounded.SupportAgent, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Report Issue with Order")
                         }
                     }
                 }

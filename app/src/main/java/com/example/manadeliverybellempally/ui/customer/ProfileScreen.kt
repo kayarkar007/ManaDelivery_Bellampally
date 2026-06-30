@@ -40,6 +40,7 @@ fun ProfileScreen(
     onAddressClick: () -> Unit,
     onOrdersClick: () -> Unit,
     onWalletClick: () -> Unit,
+    onSupportClick: () -> Unit,
     onLogout: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -116,9 +117,9 @@ fun ProfileScreen(
 
             item {
                 ProfileOptionItem(
-                    icon = Icons.Outlined.HelpOutline,
+                    icon = Icons.AutoMirrored.Filled.HelpCenter,
                     label = "Help & Support",
-                    onClick = { /* Implement Support */ }
+                    onClick = onSupportClick
                 )
             }
 

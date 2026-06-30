@@ -6,7 +6,10 @@ import com.example.manadeliverybellempally.data.model.Order
 import com.example.manadeliverybellempally.data.model.User
 import com.example.manadeliverybellempally.data.repository.FirestoreRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepository()) : ViewModel() {
@@ -16,6 +19,15 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
 
     private val _myOrders = MutableStateFlow<List<Order>>(emptyList())
     val myOrders: StateFlow<List<Order>> = _myOrders
+
+    // Phase 8: Dynamic Earnings (20 Rs Base + 5 Rs per km. Assuming 3km avg for now -> 35 Rs per delivery)
+    val totalEarnings: StateFlow<Double> = _myOrders.map { orders ->
+        orders.filter { it.status == "DELIVERED" }.size * 35.0
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    val completedDeliveriesCount: StateFlow<Int> = _myOrders.map { orders ->
+        orders.count { it.status == "DELIVERED" }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
     
     private val _availableOrders = MutableStateFlow<List<Order>>(emptyList())
     val availableOrders: StateFlow<List<Order>> = _availableOrders

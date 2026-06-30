@@ -370,4 +370,25 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
             _isLoading.value = false
         }
     }
+
+    // ═══════════════════════════════════════════
+    // PHASE 8: SUPPORT TICKETS
+    // ═══════════════════════════════════════════
+    fun createSupportTicket(orderId: String, issueType: String, description: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val ticket = SupportTicket(
+                userId = currentCustomerId,
+                userName = _currentUser.value?.name ?: "Customer",
+                orderId = orderId,
+                issueType = issueType,
+                description = description
+            )
+            val result = repository.createTicket(ticket)
+            if (result.isFailure) {
+                _orderError.value = "Failed to submit support ticket."
+            }
+            _isLoading.value = false
+        }
+    }
 }

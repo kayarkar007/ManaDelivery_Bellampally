@@ -59,7 +59,7 @@ fun RiderDashboardScreen(
                 when (selectedTab) {
                     0 -> RiderHomeTab(rider, viewModel, orders)
                     1 -> RiderDeliveriesTab(myDeliveries, viewModel)
-                    2 -> RiderFinanceTab(rider)
+                    2 -> RiderFinanceTab(rider, viewModel)
                 }
             }
         }
@@ -225,20 +225,33 @@ private fun ActiveTaskCard(
 }
 
 @Composable
-fun RiderFinanceTab(rider: User?) {
+fun RiderFinanceTab(rider: User?, viewModel: RiderViewModel) {
+    val earnings by viewModel.totalEarnings.collectAsState()
+    val deliveries by viewModel.completedDeliveriesCount.collectAsState()
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("MY EARNINGS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
         
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard(title = "Today", value = "₹0", icon = Icons.Rounded.Payments, color = ManaSuccess, modifier = Modifier.weight(1f))
+            StatCard(title = "Today", value = "₹${earnings.toInt()}", icon = Icons.Rounded.Payments, color = ManaSuccess, modifier = Modifier.weight(1f))
             StatCard(title = "Wallet", value = "₹${rider?.walletBalance?.toInt() ?: 0}", icon = Icons.Rounded.AccountBalanceWallet, color = ManaGold, modifier = Modifier.weight(1f))
+        }
+
+        ManaCard(modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    Text("Total Deliveries", style = MaterialTheme.typography.bodyMedium, color = ManaTextSecondary)
+                    Text("$deliveries", style = MaterialTheme.typography.headlineSmall, color = ManaTextPrimary, fontWeight = FontWeight.Bold)
+                }
+                Icon(Icons.AutoMirrored.Rounded.DirectionsBike, null, tint = ManaGold, modifier = Modifier.size(32.dp))
+            }
         }
         
         ManaCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Info, null, tint = ManaInfo)
                 Spacer(Modifier.width(12.dp))
-                Text("Earnings are settled every Monday to your linked bank account.", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+                Text("Earnings are settled every Monday to your linked bank account. Base pay is ₹20 + ₹5/km.", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
             }
         }
     }

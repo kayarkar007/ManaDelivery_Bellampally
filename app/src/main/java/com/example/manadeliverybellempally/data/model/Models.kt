@@ -190,10 +190,14 @@ data class SupportTicket(
     val userId: String = "",
     val userName: String = "Unknown",
     val userRole: String = "CUSTOMER",
+    val orderId: String = "",
+    val issueType: String = "",
     val subject: String = "",
     val description: String = "",
     val status: String = "OPEN",
+    val resolution: String = "",
     val createdAt: Long = System.currentTimeMillis(),
+    val resolvedAt: Long = 0L,
     val internalNotes: String = ""
 )
 

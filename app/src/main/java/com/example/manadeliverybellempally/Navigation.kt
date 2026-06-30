@@ -131,6 +131,7 @@ fun MainNavigation() {
                     onAddressClick = { backStack.add(AddressManager) },
                     onOrdersClick = { backStack.add(CustomerOrders) },
                     onWalletClick = { backStack.add(WalletScreen) },
+                    onSupportClick = { backStack.add(CustomerSupport(null)) },
                     onLogout = { authViewModel.signOut(); backStack.clear(); backStack.add(Login) },
                     onBack = { backStack.removeLastOrNull() }
                 )
@@ -178,7 +179,17 @@ fun MainNavigation() {
                 OrderTrackingScreen(
                     orderId = screen.orderId,
                     viewModel = customerViewModel,
-                    onBack = { backStack.removeLastOrNull() }
+                    onBack = { backStack.removeLastOrNull() },
+                    onSupportClick = { id -> backStack.add(CustomerSupport(id)) }
+                )
+            }
+            
+            entry<CustomerSupport> { screen ->
+                SupportScreen(
+                    orderId = screen.orderId,
+                    viewModel = customerViewModel,
+                    onBack = { backStack.removeLastOrNull() },
+                    onSubmitSuccess = { backStack.removeLastOrNull() }
                 )
             }
 

@@ -109,5 +109,6 @@ dependencies {
   implementation(libs.firebase.messaging)
   implementation(libs.firebase.storage)
   implementation(libs.firebase.appcheck.playintegrity)
+  implementation("com.google.firebase:firebase-appcheck-debug:18.0.0")
   implementation(libs.play.integrity)
 }

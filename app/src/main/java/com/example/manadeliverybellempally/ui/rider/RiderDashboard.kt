@@ -1,18 +1,26 @@
 package com.example.manadeliverybellempally.ui.rider
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.rounded.Assignment
+import androidx.compose.material.icons.automirrored.rounded.DirectionsBike
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.manadeliverybellempally.data.model.*
 import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
@@ -23,71 +31,35 @@ fun RiderDashboardScreen(
     riderId: String,
     onLogout: () -> Unit,
     viewModel: RiderViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val rider by viewModel.rider.collectAsState()
-    val availableOrders by viewModel.availableOrders.collectAsState()
-    val myOrders by viewModel.myOrders.collectAsState()
+    val orders by viewModel.availableOrders.collectAsState()
+    val myDeliveries by viewModel.myOrders.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
 
     LaunchedEffect(riderId) {
         viewModel.initialize(riderId)
     }
 
     Scaffold(
+        containerColor = ManaBgPrimary,
         topBar = {
-            TopAppBar(
-                title = { Text("Rider Dashboard", color = ManaGold, fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = onLogout) { Icon(Icons.Default.Logout, "Logout", tint = ManaGold) }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = ManaBgPrimary)
-            )
+            RiderTopBar(rider, onLogout)
         },
         bottomBar = {
-            NavigationBar(containerColor = ManaBgCard) {
-                NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
-                NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 }, icon = { Icon(Icons.Default.ListAlt, null) }, label = { Text("My Deliveries") })
-            }
-        },
-        containerColor = ManaBgPrimary
+            RiderBottomBar(selectedTab) { selectedTab = it }
+        }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (selectedTab) {
-                0 -> RiderHomeTab(rider, viewModel, availableOrders)
-                1 -> RiderDeliveriesTab(myOrders, viewModel)
-            }
-        }
-    }
-}
-
-@Composable
-fun RiderHomeTab(rider: User?, viewModel: RiderViewModel, availableOrders: List<Order>) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            ManaCard {
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Duty Status", style = MaterialTheme.typography.titleMedium, color = ManaTextPrimary)
-                        Text(if (rider?.isOnline == true) "Online" else "Offline", color = if (rider?.isOnline == true) ManaSuccess else ManaRed)
-                    }
-                    Switch(checked = rider?.isOnline == true, onCheckedChange = { viewModel.toggleDuty(it) })
-                }
-            }
-        }
-        item {
-            Text("Available Deliveries", style = MaterialTheme.typography.titleMedium, color = ManaGold)
-        }
-        items(availableOrders) { order ->
-            ManaCard {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Store: ${order.vendorName}", fontWeight = FontWeight.Bold, color = ManaTextPrimary)
-                    Text("Address: ${order.deliveryAddress}", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
-                    Text("Amount: ₹${order.total}", color = ManaGold)
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = { viewModel.acceptOrder(order.id) }, colors = ButtonDefaults.buttonColors(containerColor = ManaSuccess)) {
-                        Text("Accept Order")
-                    }
+        if (isLoading && rider == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = ManaGold) }
+        } else {
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                when (selectedTab) {
+                    0 -> RiderHomeTab(rider, viewModel, orders)
+                    1 -> RiderDeliveriesTab(myDeliveries, viewModel)
+                    2 -> RiderFinanceTab(rider)
                 }
             }
         }
@@ -95,25 +67,177 @@ fun RiderHomeTab(rider: User?, viewModel: RiderViewModel, availableOrders: List<
 }
 
 @Composable
-fun RiderDeliveriesTab(myOrders: List<Order>, viewModel: RiderViewModel) {
+private fun RiderTopBar(rider: User?, onLogout: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text("Namaste, ${rider?.name ?: "Rider"}", style = MaterialTheme.typography.headlineSmall, color = ManaGold, fontWeight = FontWeight.Bold)
+            Text("Bellempally Delivery Partner", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+        }
+        IconButton(onClick = onLogout, modifier = Modifier.background(ManaRedStrong.copy(alpha = 0.1f), CircleShape)) {
+            Icon(Icons.AutoMirrored.Rounded.Logout, "Logout", tint = ManaRed)
+        }
+    }
+}
+
+@Composable
+fun RiderHomeTab(rider: User?, viewModel: RiderViewModel, orders: List<Order>) {
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            DutyToggleCard(isOnline = rider?.isOnline ?: false) { viewModel.toggleDuty(!(rider?.isOnline ?: false)) }
+        }
+        
+        item {
+            Text("NEW ORDERS NEAR YOU", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+        }
+
+        if (orders.isEmpty()) {
+            item {
+                EmptyState(icon = Icons.Rounded.Search, title = "Waiting for Orders", subtitle = "Stay online to receive new delivery requests in Bellempally.")
+            }
+        } else {
+            items(orders) { order ->
+                RiderOrderCard(order) { viewModel.acceptOrder(order.id) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DutyToggleCard(isOnline: Boolean, onToggle: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable { onToggle() },
+        color = if (isOnline) ManaSuccess.copy(alpha = 0.1f) else ManaBgCard,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(2.dp, if (isOnline) ManaSuccess else ManaBorder)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(if (isOnline) ManaSuccess else ManaTextTertiary))
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text(if (isOnline) "YOU ARE ONLINE" else "YOU ARE OFFLINE", fontWeight = FontWeight.Black, color = if (isOnline) ManaSuccess else ManaTextPrimary)
+                    Text(if (isOnline) "Ready to take orders" else "Go online to earn", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+                }
+            }
+            Switch(checked = isOnline, onCheckedChange = { onToggle() }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = ManaSuccess))
+        }
+    }
+}
+
+@Composable
+private fun RiderOrderCard(order: Order, onAccept: () -> Unit) {
+    ManaCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(4.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("NEW ORDER", color = ManaGold, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelLarge)
+                Text("₹${order.deliveryFee.toInt()} EARNING", color = ManaSuccess, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(12.dp))
+            RiderLocationStep(icon = Icons.Rounded.Store, title = "Pickup", address = order.vendorName)
+            Spacer(Modifier.height(8.dp))
+            RiderLocationStep(icon = Icons.Rounded.PersonPinCircle, title = "Drop", address = order.deliveryAddress)
+            
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onAccept,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ManaSuccess),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("ACCEPT ORDER", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+    }
+}
+
+@Composable
+fun RiderDeliveriesTab(myDeliveries: List<Order>, viewModel: RiderViewModel) {
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(myOrders) { order ->
-            ManaCard {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Order #${order.id.takeLast(4)}", fontWeight = FontWeight.Bold, color = ManaGold)
-                        Text(order.status, color = ManaGold)
-                    }
-                    Text("Customer: ${order.customerName}", color = ManaTextPrimary)
-                    Text("Address: ${order.deliveryAddress}", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
-                    Spacer(Modifier.height(8.dp))
-                    if (order.status == "READY") {
-                        Button(onClick = { viewModel.updateStatus(order.id, "PICKED_UP") }) { Text("Mark Picked Up") }
-                    } else if (order.status == "PICKED_UP") {
-                        Button(onClick = { viewModel.updateStatus(order.id, "DELIVERED") }) { Text("Mark Delivered") }
-                    }
+        item { Text("MY ACTIVE TASKS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp) }
+        
+        if (myDeliveries.isEmpty()) {
+            item { EmptyState(icon = Icons.AutoMirrored.Rounded.Assignment, title = "No Active Tasks", subtitle = "Accepted orders will show up here.") }
+        } else {
+            items(myDeliveries) { order ->
+                ActiveTaskCard(order) { status -> viewModel.updateStatus(order.id, status) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveTaskCard(order: Order, onStatusUpdate: (String) -> Unit) {
+    ManaCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Text("ORDER #${order.id.takeLast(5).uppercase()}", fontWeight = FontWeight.Bold, color = ManaGold)
+            Text(order.vendorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ManaBorder)
+            
+            val nextStatus = when(order.status) {
+                "CONFIRMED" -> "PICKED_UP"
+                "PICKED_UP" -> "DELIVERED"
+                else -> ""
+            }
+            
+            if (nextStatus.isNotEmpty()) {
+                Button(
+                    onClick = { onStatusUpdate(nextStatus) },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("MARK AS $nextStatus", color = Color.Black, fontWeight = FontWeight.Black)
                 }
             }
         }
+    }
+}
+
+@Composable
+fun RiderFinanceTab(rider: User?) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("MY EARNINGS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatCard(title = "Today", value = "₹0", icon = Icons.Rounded.Payments, color = ManaSuccess, modifier = Modifier.weight(1f))
+            StatCard(title = "Wallet", value = "₹${rider?.walletBalance?.toInt() ?: 0}", icon = Icons.Rounded.AccountBalanceWallet, color = ManaGold, modifier = Modifier.weight(1f))
+        }
+        
+        ManaCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Info, null, tint = ManaInfo)
+                Spacer(Modifier.width(12.dp))
+                Text("Earnings are settled every Monday to your linked bank account.", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RiderLocationStep(icon: ImageVector, title: String, address: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = ManaGold, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+            Text(address, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun RiderBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
+    NavigationBar(containerColor = ManaBgCard, tonalElevation = 8.dp) {
+        NavigationBarItem(selected = selectedTab == 0, onClick = { onTabSelected(0) }, icon = { Icon(Icons.AutoMirrored.Rounded.DirectionsBike, null) }, label = { Text("Duty") })
+        NavigationBarItem(selected = selectedTab == 1, onClick = { onTabSelected(1) }, icon = { Icon(Icons.AutoMirrored.Rounded.Assignment, null) }, label = { Text("Tasks") })
+        NavigationBarItem(selected = selectedTab == 2, onClick = { onTabSelected(2) }, icon = { Icon(Icons.Rounded.Payments, null) }, label = { Text("Earnings") })
     }
 }

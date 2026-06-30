@@ -7,6 +7,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.storage.FirebaseStorage
+import android.net.Uri
 
 class FirestoreRepository {
     private val db = FirebaseFirestore.getInstance()
@@ -645,5 +647,181 @@ class FirestoreRepository {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // ═══════════════════════════════════════════
+    // ORDER CANCELLATION
+    // ═══════════════════════════════════════════
+    suspend fun cancelOrder(orderId: String, userId: String, reason: String): Result<Unit> {
+        return try {
+            val orderRef = db.collection("orders").document(orderId)
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(orderRef)
+                val status = snapshot.getString("status") ?: ""
+                val createdAt = snapshot.getLong("createdAt") ?: 0L
+                val orderUserId = snapshot.getString("userId") ?: ""
+
+                // Validate: only PLACED orders within cancel window, by order owner
+                if (status != "PLACED") {
+                    throw IllegalStateException("Order cannot be cancelled in '$status' state")
+                }
+                if (orderUserId != userId) {
+                    throw IllegalStateException("You can only cancel your own orders")
+                }
+                val elapsed = System.currentTimeMillis() - createdAt
+                if (elapsed > 2 * 60 * 1000L) {
+                    throw IllegalStateException("Cancellation window (2 minutes) has passed")
+                }
+
+                transaction.update(orderRef, mapOf(
+                    "status" to "CANCELLED",
+                    "cancelledBy" to userId,
+                    "cancelReason" to reason,
+                    "cancelledAt" to System.currentTimeMillis(),
+                    "updatedAt" to System.currentTimeMillis(),
+                    "statusTimeline.CANCELLED" to System.currentTimeMillis()
+                ))
+            }.await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // REVIEWS
+    // ═══════════════════════════════════════════
+    suspend fun submitReview(review: Review): Result<Unit> {
+        return try {
+            val id = review.id.ifEmpty { db.collection("reviews").document().id }
+            val batch = db.batch()
+
+            // 1. Save the review
+            batch.set(db.collection("reviews").document(id), review.copy(id = id))
+
+            // 2. Mark the order as reviewed
+            if (review.orderId.isNotEmpty()) {
+                batch.update(db.collection("orders").document(review.orderId), "isReviewed", true)
+            }
+
+            batch.commit().await()
+
+            // 3. Update vendor's average rating (separate transaction for safety)
+            updateVendorRating(review.vendorId)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun updateVendorRating(vendorId: String) {
+        try {
+            val reviews = db.collection("reviews")
+                .whereEqualTo("vendorId", vendorId)
+                .get().await()
+            val ratings = reviews.toObjects(Review::class.java)
+            if (ratings.isNotEmpty()) {
+                val avgRating = ratings.map { it.rating }.average()
+                db.collection("vendors").document(vendorId).update(
+                    mapOf(
+                        "rating" to (Math.round(avgRating * 10) / 10.0),
+                        "ratingCount" to ratings.size
+                    )
+                ).await()
+            }
+        } catch (e: Exception) {
+            // Non-critical — rating update can fail silently
+        }
+    }
+
+    fun getReviewsForVendorFlow(vendorId: String): Flow<List<Review>> = callbackFlow {
+        val listener = db.collection("reviews")
+            .whereEqualTo("vendorId", vendorId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val reviews = snapshot?.toObjects(Review::class.java).orEmpty()
+                    .sortedByDescending { it.createdAt }
+                trySend(reviews)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // ═══════════════════════════════════════════
+    // COUPON LOOKUP
+    // ═══════════════════════════════════════════
+    suspend fun getCouponByCode(code: String): Result<Coupon?> {
+        return try {
+            val snapshot = db.collection("coupons")
+                .whereEqualTo("code", code.uppercase().trim())
+                .limit(1)
+                .get().await()
+            val coupon = snapshot.toObjects(Coupon::class.java).firstOrNull()
+            Result.success(coupon)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // REORDER — Fetch original order items
+    // ═══════════════════════════════════════════
+    suspend fun getOrderById(orderId: String): Result<Order?> {
+        return try {
+            val snapshot = db.collection("orders").document(orderId).get().await()
+            Result.success(snapshot.toObject(Order::class.java))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // PROFILE PHOTO UPLOAD
+    // ═══════════════════════════════════════════
+    suspend fun uploadProfileImage(userId: String, imageUri: Uri): Result<String> {
+        return try {
+            val storageRef = FirebaseStorage.getInstance().reference.child("profile_images/$userId.jpg")
+            storageRef.putFile(imageUri).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            // Update user document
+            db.collection("users").document(userId).update("profileImageUrl", downloadUrl).await()
+            Result.success(downloadUrl)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ═══════════════════════════════════════════
+    // PHASE 3: VENDOR & RIDER STREAMS
+    // ═══════════════════════════════════════════
+    fun getVendorOrdersFlow(vendorId: String): Flow<List<Order>> = callbackFlow {
+        val listener = db.collection("orders")
+            .whereEqualTo("vendorId", vendorId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val orders = snapshot?.toObjects(Order::class.java).orEmpty().sortedByDescending { it.createdAt }
+                trySend(orders)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun getRiderOrdersFlow(riderId: String): Flow<List<Order>> = callbackFlow {
+        val listener = db.collection("orders")
+            .whereEqualTo("riderId", riderId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val orders = snapshot?.toObjects(Order::class.java).orEmpty().sortedByDescending { it.updatedAt }
+                trySend(orders)
+            }
+        awaitClose { listener.remove() }
     }
 }

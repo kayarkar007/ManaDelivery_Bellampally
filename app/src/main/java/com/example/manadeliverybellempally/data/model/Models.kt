@@ -70,31 +70,51 @@ data class Address(
 data class Order(
     val id: String = "",
     val userId: String = "",
-    val userName: String = "", // Added for compat
-    val userPhone: String = "", // Added for compat
+    val userName: String = "",
+    val userPhone: String = "",
     val riderId: String = "",
-    val riderName: String = "", // Added for compat
+    val riderName: String = "",
     val vendorId: String = "",
-    val vendorName: String = "", // Added for compat
+    val vendorName: String = "",
     val items: List<OrderItem> = emptyList(),
     val status: String = "PLACED",
     val deliveryStatus: String = "PENDING",
     val paymentMethod: String = "COD",
     val subtotal: Double = 0.0,
     val deliveryFee: Double = 25.0,
+    val discount: Double = 0.0,
+    val couponCode: String = "",
     val commission: Double = 0.0,
     val tax: Double = 0.0,
     val total: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis(), // Added for compat
+    val updatedAt: Long = System.currentTimeMillis(),
     val statusTimeline: Map<String, Long> = emptyMap(),
     val customerName: String = "",
     val customerPhone: String = "",
-    val deliveryAddress: String = "", // Used as a simple String for display
-    val deliveryAddressObj: Address? = null, // Used for structured data
+    val deliveryAddress: String = "",
+    val deliveryAddressObj: Address? = null,
     val deliveryOtp: String = "",
-    val prescriptionImageUrl: String = ""
-)
+    val prescriptionImageUrl: String = "",
+    // Cancellation
+    val cancelledBy: String = "",
+    val cancelReason: String = "",
+    val cancelledAt: Long = 0,
+    // Review
+    val isReviewed: Boolean = false,
+    // ETA
+    val estimatedDeliveryMinutes: Int = 0,
+) {
+    companion object {
+        /** Customer can cancel within 2 minutes of placing */
+        const val CANCEL_WINDOW_MS = 2 * 60 * 1000L
+    }
+
+    fun canCancel(): Boolean {
+        return status == "PLACED" &&
+            (System.currentTimeMillis() - createdAt) < CANCEL_WINDOW_MS
+    }
+}
 
 data class OrderItem(
     val productId: String = "",
@@ -153,11 +173,12 @@ data class Product(
     val prescriptionRequired: Boolean = false
 )
 
-// Mock classes to fix leftover Admin/Rider code
 data class Payout(
     val id: String = "",
+    val vendorId: String = "",
     val amount: Double = 0.0,
     val status: String = "PENDING",
+    val description: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -198,10 +219,33 @@ data class Coupon(
     val id: String = "",
     val code: String = "",
     val description: String = "",
-    val discountType: String = "PERCENTAGE",
+    val discountType: String = "PERCENTAGE", // PERCENTAGE or FLAT
     val discountValue: Double = 0.0,
-    val isActive: Boolean = true
-)
+    val minOrderAmount: Double = 0.0,
+    val maxDiscountAmount: Double = 0.0, // Cap for percentage discounts
+    val expiresAt: Long = 0, // 0 = never expires
+    val usageLimit: Int = 0, // 0 = unlimited
+    val usedCount: Int = 0,
+    val isActive: Boolean = true,
+) {
+    fun isValid(orderSubtotal: Double): Boolean {
+        if (!isActive) return false
+        if (expiresAt > 0 && System.currentTimeMillis() > expiresAt) return false
+        if (usageLimit > 0 && usedCount >= usageLimit) return false
+        if (minOrderAmount > 0 && orderSubtotal < minOrderAmount) return false
+        return true
+    }
+
+    fun calculateDiscount(orderSubtotal: Double): Double {
+        if (!isValid(orderSubtotal)) return 0.0
+        val raw = when (discountType) {
+            "PERCENTAGE" -> orderSubtotal * (discountValue / 100.0)
+            "FLAT" -> discountValue
+            else -> 0.0
+        }
+        return if (maxDiscountAmount > 0) minOf(raw, maxDiscountAmount) else raw
+    }
+}
 
 data class Banner(
     val id: String = "",
@@ -211,4 +255,18 @@ data class Banner(
     val isActive: Boolean = true,
     val title: String = "",
     val sortOrder: Int = 0
+)
+
+// ═══════════════════════════════════════════
+// Review Model
+// ═══════════════════════════════════════════
+data class Review(
+    val id: String = "",
+    val orderId: String = "",
+    val userId: String = "",
+    val userName: String = "",
+    val vendorId: String = "",
+    val rating: Int = 5, // 1-5 stars
+    val comment: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
 )

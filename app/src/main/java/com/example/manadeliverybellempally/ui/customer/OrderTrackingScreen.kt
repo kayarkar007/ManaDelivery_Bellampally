@@ -21,6 +21,9 @@ import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.*
+import com.example.manadeliverybellempally.data.model.Order
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +34,21 @@ fun OrderTrackingScreen(
 ) {
     val orders by viewModel.orders.collectAsState()
     val order = orders.find { it.id == orderId }
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    var showCancelDialog by remember { mutableStateOf(false) }
+    var cancelReason by remember { mutableStateOf("") }
+    var rating by remember { mutableStateOf(5) }
+    var reviewComment by remember { mutableStateOf("") }
+    
+    // Live timer for cancellation window and ETA
+    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -61,6 +79,29 @@ fun OrderTrackingScreen(
                                 Text(order.status.replace("_", " "), style = MaterialTheme.typography.headlineSmall, color = ManaGold, fontWeight = FontWeight.Black)
                             }
                             OrderStatusChip(status = order.status)
+                        }
+                        
+                        // ETA calculation
+                        if (order.status != "DELIVERED" && order.status != "CANCELLED") {
+                            val elapsedMinutes = (currentTime - order.createdAt) / (60 * 1000)
+                            val remainingMinutes = (order.estimatedDeliveryMinutes - elapsedMinutes).coerceAtLeast(0)
+                            
+                            Spacer(Modifier.height(16.dp))
+                            Divider(color = ManaBorder.copy(alpha = 0.5f))
+                            Spacer(Modifier.height(16.dp))
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Timer, contentDescription = null, tint = ManaGold)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Estimated Arrival", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                                    if (remainingMinutes > 0) {
+                                        Text("$remainingMinutes mins", style = MaterialTheme.typography.titleMedium, color = ManaTextPrimary, fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Text("Arriving any moment", style = MaterialTheme.typography.titleMedium, color = ManaSuccess, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -110,8 +151,112 @@ fun OrderTrackingScreen(
                         }
                     }
                 }
+
+                // Action Buttons / Sections
+                item {
+                    // Cancel Window
+                    if (order.status == "PLACED" && (currentTime - order.createdAt) < Order.CANCEL_WINDOW_MS) {
+                        val secondsLeft = (Order.CANCEL_WINDOW_MS - (currentTime - order.createdAt)) / 1000
+                        Button(
+                            onClick = { showCancelDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = ManaRedStrong)
+                        ) {
+                            Text("Cancel Order (0:${secondsLeft.toString().padStart(2, '0')})")
+                        }
+                    }
+                    
+                    // Reorder
+                    if (order.status == "DELIVERED" || order.status == "CANCELLED") {
+                        ManaGradientButton(
+                            text = "Reorder",
+                            icon = Icons.Rounded.Refresh,
+                            onClick = {
+                                viewModel.reorder(order.id)
+                                onBack() // Send user back to cart/checkout flow
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            isLoading = isLoading
+                        )
+                    }
+                    
+                    // Ratings & Reviews
+                    if (order.status == "DELIVERED" && !order.isReviewed) {
+                        Spacer(Modifier.height(16.dp))
+                        SectionHeader(title = "Rate your experience", subtitle = "Help us improve")
+                        ManaCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                                Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                                    (1..5).forEach { i ->
+                                        IconButton(onClick = { rating = i }) {
+                                            Icon(
+                                                imageVector = if (i <= rating) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                                                contentDescription = null,
+                                                tint = ManaGold,
+                                                modifier = Modifier.size(36.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = reviewComment,
+                                    onValueChange = { reviewComment = it },
+                                    placeholder = { Text("Write a review (optional)") },
+                                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold)
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Button(
+                                    onClick = { viewModel.submitReview(order.id, order.vendorId, rating, reviewComment) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold, contentColor = ManaBgPrimary),
+                                    enabled = !isLoading
+                                ) {
+                                    Text("Submit Review")
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 item { Spacer(Modifier.height(32.dp)) }
+            }
+            
+            if (showCancelDialog) {
+                AlertDialog(
+                    onDismissRequest = { showCancelDialog = false },
+                    title = { Text("Cancel Order", color = ManaTextPrimary, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column {
+                            Text("Are you sure you want to cancel this order?", color = ManaTextSecondary)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = cancelReason,
+                                onValueChange = { cancelReason = it },
+                                placeholder = { Text("Reason for cancellation (optional)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold)
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.cancelOrder(order.id, if (cancelReason.isBlank()) "Customer changed mind" else cancelReason)
+                                showCancelDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ManaRedStrong)
+                        ) {
+                            Text("Confirm Cancel")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showCancelDialog = false }) {
+                            Text("Keep Order", color = ManaTextTertiary)
+                        }
+                    },
+                    containerColor = ManaBgCard
+                )
             }
         }
     }

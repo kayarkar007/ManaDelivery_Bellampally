@@ -52,10 +52,11 @@ fun CategoryDetailScreen(
                 items(vendors) { vendor ->
                     VendorCard(
                         storeName = vendor.storeName,
-                        category = vendor.categoryName,
+                           categoryName = vendor.categoryName,
                         rating = vendor.rating.toFloat(),
-                        deliveryTime = 20,
+                        deliveryTime = vendor.deliveryTimeMinutes,
                         isOpen = vendor.isStoreOpen,
+                        isBusy = vendor.isBusy,
                         onClick = { onVendorClick(vendor.id) }
                     )
                 }

@@ -8,6 +8,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.example.manadeliverybellempally.MainActivity
 import com.example.manadeliverybellempally.R
+import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -18,6 +21,7 @@ class ManaMessagingService : FirebaseMessagingService() {
         val message = remoteMessage.notification?.body ?: remoteMessage.data["message"] ?: "New Update"
         val type = remoteMessage.data["type"] ?: "SYSTEM"
 
+        Log.d("ManaFCM", "Message received: type=$type, title=$title")
         showNotification(title, message, type)
     }
 
@@ -25,6 +29,7 @@ class ManaMessagingService : FirebaseMessagingService() {
         val channelId = when (type) {
             "ORDER" -> "order_alerts"
             "PROMO" -> "promotions"
+            "RIDER" -> "rider_alerts"
             else -> "default"
         }
 
@@ -34,13 +39,15 @@ class ManaMessagingService : FirebaseMessagingService() {
             val name = when (type) {
                 "ORDER" -> "New Order Alerts"
                 "PROMO" -> "Offers & Promotions"
+                "RIDER" -> "Delivery Alerts"
                 else -> "System Notifications"
             }
-            val importance = if (type == "ORDER") NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
+            val importance = if (type == "ORDER" || type == "RIDER") 
+                NotificationManager.IMPORTANCE_HIGH else NotificationManager.IMPORTANCE_DEFAULT
             val channel = NotificationChannel(channelId, name, importance)
             
-            if (type == "ORDER") {
-                channel.description = "Loud alerts for new incoming orders"
+            if (type == "ORDER" || type == "RIDER") {
+                channel.description = "Important alerts for orders and deliveries"
                 channel.enableVibration(true)
             }
             
@@ -56,7 +63,7 @@ class ManaMessagingService : FirebaseMessagingService() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(message)
-            .setPriority(if (type == "ORDER") NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(if (type == "ORDER" || type == "RIDER") NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
 
@@ -64,6 +71,15 @@ class ManaMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
-        // Token update logic would go here
+        Log.d("ManaFCM", "New FCM token generated: ${token.take(10)}...")
+        // Save the new token to Firestore so push notifications reach this device
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .update("fcmToken", token)
+            .addOnFailureListener { e ->
+                Log.e("ManaFCM", "Failed to update FCM token", e)
+            }
     }
 }

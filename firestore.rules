@@ -2,76 +2,183 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ═══════════════════════════════════════════
+    // Helper Functions
+    // ═══════════════════════════════════════════
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
     }
 
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isVendorRole() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'VENDOR';
+    }
+
+    function isRiderRole() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'RIDER';
+    }
+
+    // ═══════════════════════════════════════════
+    // USERS — Own profile or admin
+    // ═══════════════════════════════════════════
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if isAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'subRole', 'walletBalance', 'approvalStatus', 'commissionRate']));
+      allow read: if isSignedIn();
+      // New users can only be created as CUSTOMER role
+      allow create: if isOwner(userId) && request.resource.data.role == 'CUSTOMER';
+      // Users CANNOT change their own 'role' or 'approvalStatus'
+      allow update: if isOwner(userId) && 
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.approvalStatus == resource.data.approvalStatus;
+      // Admin can do anything
+      allow update: if isAdmin();
     }
 
+    // ═══════════════════════════════════════════
+    // VENDORS — Public read, owner/admin write
+    // ═══════════════════════════════════════════
     match /vendors/{vendorId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == vendorId;
-      allow update: if isAdmin() || (isOwner(vendorId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'ratingCount', 'approvalStatus']));
+      allow create: if isAdmin();
+      allow update: if isOwner(vendorId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
+    // ═══════════════════════════════════════════
+    // PRODUCTS — Public read, vendor owner/admin write
+    // ═══════════════════════════════════════════
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isSignedIn() && 
+        (request.resource.data.vendorId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && 
+        (resource.data.vendorId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && 
+        (resource.data.vendorId == request.auth.uid || isAdmin());
+    }
+
+    // ═══════════════════════════════════════════
+    // ORDERS — Strict per-role access
+    // ═══════════════════════════════════════════
+    match /orders/{orderId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.vendorId == request.auth.uid ||
+        resource.data.riderId == request.auth.uid ||
+        (resource.data.status == 'READY' && isRiderRole()) ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.vendorId == request.auth.uid ||
+        resource.data.riderId == request.auth.uid ||
+        (resource.data.status == 'READY' && isRiderRole()) ||
+        isAdmin()
+      );
+      allow delete: if false;
+    }
+
+    // ═══════════════════════════════════════════
+    // CATEGORIES — Public read, admin-only write
+    // ═══════════════════════════════════════════
     match /categories/{categoryId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /products/{productId} {
+    // ═══════════════════════════════════════════
+    // BANNERS — Public read, admin-only write
+    // ═══════════════════════════════════════════
+    match /banners/{bannerId} {
       allow read: if true;
-      allow create: if isAdmin() || (request.auth != null && request.resource.data.vendorId == request.auth.uid);
-      allow update: if isAdmin() || (request.auth != null && resource.data.vendorId == request.auth.uid);
-      allow delete: if isAdmin() || (request.auth != null && resource.data.vendorId == request.auth.uid);
-    }
-
-    match /orders/{orderId} {
-      allow read: if request.auth != null && (
-        request.auth.uid == resource.data.userId ||
-        request.auth.uid == resource.data.vendorId ||
-        request.auth.uid == resource.data.riderId ||
-        isAdmin()
-      );
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null && (
-        isAdmin() ||
-        (request.auth.uid == resource.data.vendorId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'statusTimeline', 'rejectionReason', 'preparationTimeMinutes'])) ||
-        (request.auth.uid == resource.data.riderId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'statusTimeline', 'currentLat', 'currentLng'])) ||
-        (request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rating', 'review', 'updatedAt', 'statusTimeline']))
-      );
-    }
-
-    match /coupons/{couponId} { allow read: if true; allow write: if isAdmin(); }
-    match /banners/{bannerId} { allow read: if true; allow write: if isAdmin(); }
-
-    match /payouts/{payoutId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.vendorId || isAdmin());
       allow write: if isAdmin();
     }
 
-    match /tickets/{ticketId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
+    // ═══════════════════════════════════════════
+    // COUPONS — Signed-in read, admin-only write
+    // ═══════════════════════════════════════════
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
+    // ═══════════════════════════════════════════
+    // PAYOUTS — Owner read, admin write
+    // ═══════════════════════════════════════════
+    match /payouts/{payoutId} {
+      allow read: if isSignedIn() && 
+        (resource.data.vendorId == request.auth.uid || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ═══════════════════════════════════════════
+    // SETTINGS — Public read, admin-only write
+    // ═══════════════════════════════════════════
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // SUPPORT TICKETS — User creates/reads own, admin manages
+    // ═══════════════════════════════════════════
+    match /tickets/{ticketId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // AUDIT LOGS — Admin-only, immutable
+    // ═══════════════════════════════════════════
     match /audit_logs/{logId} {
       allow read: if isAdmin();
-      allow write: if false; // System generated only via functions or admin app logic (if rules allowed)
+      allow create: if isAdmin();
+      allow update: if false;
+      allow delete: if false;
     }
 
-    match /settings/{docId} {
+    // ═══════════════════════════════════════════
+    // REVIEWS — Public read, customer creates
+    // ═══════════════════════════════════════════
+    match /reviews/{reviewId} {
       allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // WALLET TRANSACTIONS — Owner read, admin write
+    // ═══════════════════════════════════════════
+    match /wallet_transactions/{txnId} {
+      allow read: if isSignedIn() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
       allow write: if isAdmin();
+    }
+
+    // ═══════════════════════════════════════════
+    // NOTIFICATIONS — User reads own
+    // ═══════════════════════════════════════════
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && 
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin() || isVendorRole();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
     }
   }
 }

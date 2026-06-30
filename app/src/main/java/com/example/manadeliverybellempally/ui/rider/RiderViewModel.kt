@@ -1,101 +1,58 @@
 package com.example.manadeliverybellempally.ui.rider
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.manadeliverybellempally.data.model.*
+import com.example.manadeliverybellempally.data.model.Order
+import com.example.manadeliverybellempally.data.model.User
 import com.example.manadeliverybellempally.data.repository.FirestoreRepository
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepository()) : ViewModel() {
 
     private val _rider = MutableStateFlow<User?>(null)
-    val rider: StateFlow<User?> = _rider.asStateFlow()
-
-    private val _availableOrders = MutableStateFlow<List<Order>>(emptyList())
-    val availableOrders: StateFlow<List<Order>> = _availableOrders.asStateFlow()
+    val rider: StateFlow<User?> = _rider
 
     private val _myOrders = MutableStateFlow<List<Order>>(emptyList())
-    val myOrders: StateFlow<List<Order>> = _myOrders.asStateFlow()
-
-    private val _payouts = MutableStateFlow<List<Payout>>(emptyList())
-    val payouts: StateFlow<List<Payout>> = _payouts.asStateFlow()
-
-    private val _tickets = MutableStateFlow<List<SupportTicket>>(emptyList())
-    val tickets: StateFlow<List<SupportTicket>> = _tickets.asStateFlow()
+    val myOrders: StateFlow<List<Order>> = _myOrders
+    
+    private val _availableOrders = MutableStateFlow<List<Order>>(emptyList())
+    val availableOrders: StateFlow<List<Order>> = _availableOrders
 
     private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    val isLoading: StateFlow<Boolean> = _isLoading
 
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
-
-    private var currentRiderId = ""
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
 
     fun initialize(riderId: String) {
-        if (currentRiderId == riderId) return
-        currentRiderId = riderId
-
         viewModelScope.launch {
-            repository.getUserFlow(riderId).collect { _rider.value = it }
-        }
-
-        viewModelScope.launch {
-            repository.getAvailableDeliveriesFlow().collect { _availableOrders.value = it }
-        }
-
-        viewModelScope.launch {
-            repository.getOrdersForRiderFlow(riderId).collect { _myOrders.value = it }
-        }
-
-        viewModelScope.launch {
-            repository.getPayoutsFlow(riderId).collect { _payouts.value = it }
-        }
-
-        viewModelScope.launch {
-            repository.getTicketsFlow(riderId).collect { _tickets.value = it }
+            _isLoading.value = true
+            _rider.value = User(id = riderId, role = "rider", name = "Test Rider", isOnline = true, vehicleNumber = "TS 00 0000")
+            
+            launch {
+                repository.getRiderOrdersFlow(riderId).collect {
+                    _myOrders.value = it
+                }
+            }
+            launch {
+                repository.getAvailableDeliveriesFlow().collect {
+                    _availableOrders.value = it
+                }
+            }
+            _isLoading.value = false
         }
     }
 
-    // ─── DUTY & COMPLIANCE ───
     fun toggleDuty(isOnline: Boolean) {
-        viewModelScope.launch {
-            val riderObj = _rider.value
-            if (isOnline && riderObj?.approvalStatus != "APPROVED") {
-                _errorMessage.value = "Documents not approved yet. Access restricted."
-                return@launch
-            }
-            repository.updateRiderOnlineStatus(currentRiderId, isOnline)
-        }
+        _rider.value = _rider.value?.copy(isOnline = isOnline)
     }
 
-    fun uploadKYC(docType: String, url: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            repository.updateRiderKYC(currentRiderId, docType, url)
-            _isLoading.value = false
-        }
-    }
-
-    fun updateVehicle(type: String, number: String, model: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            repository.updateRiderVehicle(currentRiderId, type, number, model)
-            _isLoading.value = false
-        }
-    }
-
-    // ─── DELIVERY FLOW ───
     fun acceptOrder(orderId: String) {
+        val r = _rider.value ?: return
         viewModelScope.launch {
-            _isLoading.value = true
-            val riderObj = _rider.value ?: return@launch
-            val result = repository.assignRiderToOrder(orderId, currentRiderId, riderObj.name, "")
-            if (result.isFailure) {
-                _errorMessage.value = result.exceptionOrNull()?.message ?: "Order already taken or unavailable"
-            }
-            _isLoading.value = false
+            repository.assignRiderToOrder(orderId, r.id, r.name, r.phone)
         }
     }
 
@@ -105,25 +62,16 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
         }
     }
 
-    fun confirmCOD(orderId: String, amount: Double) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            repository.confirmCODCollection(orderId, currentRiderId, amount)
-            _isLoading.value = false
-        }
+    fun clearError() {
+        _error.value = null
     }
 
-    // ─── SUPPORT ───
-    fun createTicket(subject: String, description: String, orderId: String = "") {
-        viewModelScope.launch {
-            val ticket = SupportTicket(
-                userId = currentRiderId,
-                subject = subject,
-                description = description + (if (orderId.isNotEmpty()) "\nLinked Order: #$orderId" else "")
-            )
-            repository.createTicket(ticket)
-        }
+    fun updateVehicle(vehicleType: String, vehicleNumber: String, vehicleModel: String) {
+        val curr = _rider.value ?: return
+        _rider.value = curr.copy(
+            vehicleType = vehicleType,
+            vehicleNumber = vehicleNumber,
+            vehicleModel = vehicleModel
+        )
     }
-
-    fun clearError() { _errorMessage.value = null }
 }

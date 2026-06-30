@@ -94,12 +94,13 @@ fun ManaCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     border: BorderStroke? = BorderStroke(1.dp, ManaBorder.copy(alpha = 0.5f)),
+    containerColor: Color = ManaBgCard,
     content: @Composable (ColumnScope.() -> Unit)
 ) {
     Card(
         modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = ManaBgCard),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         border = border,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -167,7 +168,7 @@ fun SectionHeader(
 @Composable
 fun VendorCard(
     storeName: String,
-    category: String,
+    categoryName: String,
     rating: Float,
     deliveryTime: Int,
     isOpen: Boolean,
@@ -175,25 +176,20 @@ fun VendorCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .width(280.dp)
-            .clickable(onClick = onClick)
-            .shadow(4.dp, RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = ManaBgCard),
-        border = BorderStroke(1.dp, ManaBorder.copy(alpha = 0.3f))
+    ManaCard(
+        modifier = modifier.width(280.dp),
+        onClick = onClick
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(Brush.verticalGradient(listOf(ManaRedStrong, ManaRed.copy(alpha = 0.8f)))),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Storefront, null, modifier = Modifier.size(100.dp).alpha(0.05f), tint = ManaGold)
+                Icon(Icons.Rounded.Storefront, null, modifier = Modifier.size(80.dp).alpha(0.1f), tint = ManaGold)
                 Text(storeName.take(1).uppercase(), style = MaterialTheme.typography.displayLarge, color = ManaGold.copy(alpha = 0.15f), fontWeight = FontWeight.Black)
                 
                 if (isBusy && isOpen) {
@@ -211,7 +207,7 @@ fun VendorCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(top = 16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(storeName, style = MaterialTheme.typography.titleMedium, color = ManaTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Surface(color = ManaSuccess.copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
@@ -222,7 +218,7 @@ fun VendorCard(
                         }
                     }
                 }
-                Text(category, style = MaterialTheme.typography.bodySmall, color = ManaGold.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
+                Text(categoryName, style = MaterialTheme.typography.bodySmall, color = ManaGold.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.AccessTime, null, tint = ManaTextTertiary, modifier = Modifier.size(16.dp))

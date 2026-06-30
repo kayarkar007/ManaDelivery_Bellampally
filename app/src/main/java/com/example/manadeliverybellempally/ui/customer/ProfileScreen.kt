@@ -23,6 +23,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.example.manadeliverybellempally.R
 import com.example.manadeliverybellempally.data.model.User
 import com.example.manadeliverybellempally.theme.*
@@ -40,6 +44,12 @@ fun ProfileScreen(
     onBack: () -> Unit
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
+    
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.uploadProfilePhoto(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -64,7 +74,10 @@ fun ProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
-                ProfileHeader(user = currentUser)
+                ProfileHeader(
+                    user = currentUser,
+                    onPhotoClick = { launcher.launch("image/*") }
+                )
             }
 
             item {
@@ -140,7 +153,7 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileHeader(user: User?) {
+private fun ProfileHeader(user: User?, onPhotoClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
@@ -151,14 +164,24 @@ private fun ProfileHeader(user: User?) {
                         colors = listOf(ManaRedStrong, ManaGold)
                     )
                 )
-                .border(2.dp, ManaGold, CircleShape),
+                .border(2.dp, ManaGold, CircleShape)
+                .clickable { onPhotoClick() },
             contentAlignment = Alignment.Center
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.app_logo),
-                contentDescription = null,
-                modifier = Modifier.size(60.dp)
-            )
+            if (user?.profileImageUrl?.isNotEmpty() == true) {
+                AsyncImage(
+                    model = user.profileImageUrl,
+                    contentDescription = "Profile Photo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.app_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(60.dp)
+                )
+            }
         }
         Spacer(Modifier.height(16.dp))
         Text(

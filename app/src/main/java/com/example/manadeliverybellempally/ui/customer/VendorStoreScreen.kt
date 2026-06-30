@@ -34,9 +34,32 @@ fun VendorStoreScreen(
     val cart by viewModel.cart.collectAsState()
     
     val vendor = remember(vendors, vendorId) { vendors.find { it.id == vendorId } }
+    val cartConflict by viewModel.cartConflict.collectAsState()
 
     LaunchedEffect(vendorId) {
         viewModel.loadProductsForVendor(vendorId)
+    }
+
+    if (cartConflict != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCartConflict() },
+            title = { Text("Replace Cart?", color = ManaTextPrimary, fontWeight = FontWeight.Bold) },
+            text = { Text("Your cart contains items from a different store. Do you want to clear the cart and add this item instead?", color = ManaTextSecondary) },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.replaceCartWith(cartConflict!!) },
+                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold)
+                ) {
+                    Text("Replace Cart", color = ManaBgPrimary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissCartConflict() }) {
+                    Text("Cancel", color = ManaTextTertiary)
+                }
+            },
+            containerColor = ManaBgCard
+        )
     }
 
     Scaffold(

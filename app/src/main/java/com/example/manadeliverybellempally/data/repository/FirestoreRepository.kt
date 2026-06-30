@@ -398,14 +398,43 @@ class FirestoreRepository {
 
     suspend fun updateOrderStatus(orderId: String, status: String): Result<Unit> {
         return try {
-            db.collection("orders").document(orderId)
-                .update(
+            val orderRef = db.collection("orders").document(orderId)
+            
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(orderRef)
+                
+                transaction.update(
+                    orderRef,
                     mapOf(
                         "status" to status,
                         "updatedAt" to System.currentTimeMillis(),
                         "statusTimeline.$status" to System.currentTimeMillis()
                     )
-                ).await()
+                )
+
+                // If delivered, award points
+                if (status == "DELIVERED") {
+                    val userId = snapshot.getString("userId")
+                    val pointsEarned = snapshot.getDouble("pointsEarned") ?: 0.0
+                    
+                    if (userId != null && pointsEarned > 0) {
+                        val userRef = db.collection("users").document(userId)
+                        val userSnapshot = transaction.get(userRef)
+                        val currentBalance = userSnapshot.getDouble("walletBalance") ?: 0.0
+                        transaction.update(userRef, "walletBalance", currentBalance + pointsEarned)
+                        
+                        val txRef = db.collection("wallet_transactions").document()
+                        val tx = WalletTransaction(
+                            id = txRef.id,
+                            userId = userId,
+                            amount = pointsEarned,
+                            type = "EARNED",
+                            orderId = orderId
+                        )
+                        transaction.set(txRef, tx)
+                    }
+                }
+            }.await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -933,4 +962,50 @@ class FirestoreRepository {
         awaitClose { listener.remove() }
     }
 
+    // ═══════════════════════════════════════════
+    // PHASE 11: WALLET & LOYALTY
+    // ═══════════════════════════════════════════
+    suspend fun deductWalletBalance(userId: String, amount: Double, orderId: String): Result<Unit> {
+        return try {
+            db.runTransaction { transaction ->
+                val userRef = db.collection("users").document(userId)
+                val snapshot = transaction.get(userRef)
+                val currentBalance = snapshot.getDouble("walletBalance") ?: 0.0
+                
+                if (currentBalance < amount) {
+                    throw Exception("Insufficient wallet balance.")
+                }
+                
+                transaction.update(userRef, "walletBalance", currentBalance - amount)
+                
+                val txRef = db.collection("wallet_transactions").document()
+                val tx = WalletTransaction(
+                    id = txRef.id,
+                    userId = userId,
+                    amount = amount,
+                    type = "REDEEMED",
+                    orderId = orderId
+                )
+                transaction.set(txRef, tx)
+            }.await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun getWalletTransactionsFlow(userId: String): Flow<List<WalletTransaction>> = callbackFlow {
+        val listener = db.collection("wallet_transactions")
+            .whereEqualTo("userId", userId)
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val txs = snapshot?.documents?.mapNotNull { it.toObject(WalletTransaction::class.java) } ?: emptyList()
+                trySend(txs)
+            }
+        awaitClose { listener.remove() }
+    }
 }

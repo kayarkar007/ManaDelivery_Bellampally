@@ -34,6 +34,9 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser
 
+    private val _walletTransactions = MutableStateFlow<List<WalletTransaction>>(emptyList())
+    val walletTransactions: StateFlow<List<WalletTransaction>> = _walletTransactions
+
     private val _banners = MutableStateFlow<List<Banner>>(emptyList())
     val banners: StateFlow<List<Banner>> = _banners
 
@@ -88,6 +91,7 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
                 launch { repository.getOrdersForCustomerFlow(customerId).collect { _orders.value = it } }
                 launch { repository.getUserFlow(customerId).collect { _currentUser.value = it } }
                 launch { repository.getActiveCouponsFlow().collect { _activePromos.value = it } }
+                launch { repository.getWalletTransactionsFlow(customerId).collect { _walletTransactions.value = it } }
                 
                 delay(800) // Small delay for smooth shimmer transition
             } catch (e: Exception) {
@@ -169,7 +173,23 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
 
     fun getDeliveryFee(): Double = 25.0
 
-    fun getCartTotal(): Double = getCartSubtotal() + getDeliveryFee() - getDiscountAmount()
+    private val _useWalletBalance = MutableStateFlow(false)
+    val useWalletBalance: StateFlow<Boolean> = _useWalletBalance
+
+    fun toggleWalletBalance(use: Boolean) {
+        _useWalletBalance.value = use
+    }
+
+    fun getPointsToRedeem(): Double {
+        if (!_useWalletBalance.value) return 0.0
+        val walletBalance = _currentUser.value?.walletBalance ?: 0.0
+        val totalBeforeWallet = getCartSubtotal() + getDeliveryFee() - getDiscountAmount()
+        return if (walletBalance >= totalBeforeWallet) totalBeforeWallet else walletBalance
+    }
+
+    fun getCartTotal(): Double {
+        return getCartSubtotal() + getDeliveryFee() - getDiscountAmount() - getPointsToRedeem()
+    }
 
     fun getDiscountAmount(): Double {
         val coupon = _appliedCoupon.value ?: return 0.0
@@ -254,7 +274,13 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
                 val p = _products.value.find { it.id == entry.key } ?: Product()
                 OrderItem(productId = p.id, name = p.name, price = p.price, qty = entry.value)
             }
+            val newOrderId = java.util.UUID.randomUUID().toString()
+            val ptsRedeemed = getPointsToRedeem()
+            val finalTotal = getCartTotal()
+            val ptsEarned = finalTotal / 10.0 // 1 point per 10 rs spent
+
             val order = Order(
+                id = newOrderId,
                 userId = currentCustomerId,
                 userName = _currentUser.value?.name ?: "Customer",
                 userPhone = _currentUser.value?.phone ?: "",
@@ -265,7 +291,9 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
                 deliveryFee = getDeliveryFee(),
                 discount = getDiscountAmount(),
                 couponCode = _appliedCoupon.value?.code ?: "",
-                total = getCartTotal(),
+                total = finalTotal,
+                pointsRedeemed = ptsRedeemed,
+                pointsEarned = ptsEarned,
                 paymentMethod = paymentMethod,
                 deliveryAddress = address,
                 deliveryAddressObj = addressObj,
@@ -277,6 +305,10 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
             )
             val result = repository.createOrder(order)
             if (result.isSuccess) {
+                if (ptsRedeemed > 0) {
+                    repository.deductWalletBalance(currentCustomerId, ptsRedeemed, newOrderId)
+                }
+                
                 if (paymentMethod == "UPI") {
                     // Hand control over to UI/Activity to start Razorpay
                     onOrderCreated?.invoke(order)
@@ -285,6 +317,7 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
                     clearCart()
                     _orderSuccess.value = true
                     _appliedCoupon.value = null
+                    _useWalletBalance.value = false
                 }
             } else {
                 _orderError.value = result.exceptionOrNull()?.message ?: "Order failed. Please try again."

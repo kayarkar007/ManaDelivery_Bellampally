@@ -44,6 +44,7 @@ fun CheckoutScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     
     val currentUser by viewModel.currentUser.collectAsState()
+    val useWalletBalance by viewModel.useWalletBalance.collectAsState()
     val orderError by viewModel.orderError.collectAsState()
     val orderSuccess by viewModel.orderSuccess.collectAsState()
     
@@ -240,6 +241,34 @@ fun CheckoutScreen(
                                 Text("- ₹${discount.toInt()}", color = ManaSuccess)
                             }
                         }
+                        
+                        val pointsRedeemed = viewModel.getPointsToRedeem()
+                        if (pointsRedeemed > 0) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Wallet Points Used", color = ManaGold)
+                                Text("- ₹${pointsRedeemed.toInt()}", color = ManaGold)
+                            }
+                        }
+                        
+                        val walletBalance = currentUser?.walletBalance ?: 0.0
+                        if (walletBalance > 0) {
+                            Row(
+                                Modifier.fillMaxWidth(), 
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Use Wallet Balance", color = ManaTextPrimary)
+                                    Text("Available: ₹${walletBalance.toInt()}", style = MaterialTheme.typography.labelSmall, color = ManaTextSecondary)
+                                }
+                                Switch(
+                                    checked = useWalletBalance,
+                                    onCheckedChange = { viewModel.toggleWalletBalance(it) },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = ManaGold, checkedTrackColor = ManaGold.copy(alpha = 0.3f))
+                                )
+                            }
+                        }
+
                         Divider(color = ManaBorder)
                         Row(
                             modifier = Modifier.fillMaxWidth(),

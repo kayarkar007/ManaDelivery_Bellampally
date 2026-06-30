@@ -91,6 +91,8 @@ data class Order(
     val commission: Double = 0.0,
     val tax: Double = 0.0,
     val total: Double = 0.0,
+    val pointsEarned: Double = 0.0,
+    val pointsRedeemed: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val statusTimeline: Map<String, Long> = emptyMap(),
@@ -159,6 +161,15 @@ data class Vendor(
     val deliveryTimeMinutes: Int = 20,
     val minimumOrder: Double = 0.0,
     val ratingCount: Int = 0
+)
+
+data class WalletTransaction(
+    val id: String = "",
+    val userId: String = "",
+    val amount: Double = 0.0,
+    val type: String = "EARNED", // EARNED, REDEEMED
+    val orderId: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 data class Product(

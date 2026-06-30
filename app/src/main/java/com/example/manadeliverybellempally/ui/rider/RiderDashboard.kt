@@ -167,14 +167,36 @@ fun RiderDeliveriesTab(myDeliveries: List<Order>, viewModel: RiderViewModel) {
             item { EmptyState(icon = Icons.AutoMirrored.Rounded.Assignment, title = "No Active Tasks", subtitle = "Accepted orders will show up here.") }
         } else {
             items(myDeliveries) { order ->
-                ActiveTaskCard(order) { status -> viewModel.updateStatus(order.id, status) }
+                ActiveTaskCard(
+                    order = order,
+                    onStatusUpdate = { status -> viewModel.updateStatus(order.id, status) },
+                    onPingLocation = { lat, lng -> viewModel.pingLocation(order.id, lat, lng) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ActiveTaskCard(order: Order, onStatusUpdate: (String) -> Unit) {
+private fun ActiveTaskCard(
+    order: Order, 
+    onStatusUpdate: (String) -> Unit,
+    onPingLocation: (Double, Double) -> Unit
+) {
+    // Mock Live Pinging
+    if (order.status == "OUT_FOR_DELIVERY") {
+        LaunchedEffect(order.id) {
+            var lat = 19.0601 // Mock starting point near Bellempally
+            var lng = 79.4890
+            while(true) {
+                lat += 0.0001
+                lng += 0.0001
+                onPingLocation(lat, lng)
+                kotlinx.coroutines.delay(3000)
+            }
+        }
+    }
+
     ManaCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Text("ORDER #${order.id.takeLast(5).uppercase()}", fontWeight = FontWeight.Bold, color = ManaGold)
@@ -182,8 +204,9 @@ private fun ActiveTaskCard(order: Order, onStatusUpdate: (String) -> Unit) {
             HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ManaBorder)
             
             val nextStatus = when(order.status) {
-                "CONFIRMED" -> "PICKED_UP"
-                "PICKED_UP" -> "DELIVERED"
+                "ACCEPTED" -> "OUT_FOR_DELIVERY"
+                "READY_FOR_PICKUP" -> "OUT_FOR_DELIVERY"
+                "OUT_FOR_DELIVERY" -> "DELIVERED"
                 else -> ""
             }
             

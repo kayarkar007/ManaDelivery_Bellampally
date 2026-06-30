@@ -80,6 +80,9 @@ data class Order(
     val status: String = "PLACED",
     val deliveryStatus: String = "PENDING",
     val paymentMethod: String = "COD",
+    val paymentStatus: String = "PENDING", // PENDING, PAID, FAILED
+    val riderLocationLat: Double = 0.0,
+    val riderLocationLng: Double = 0.0,
     val subtotal: Double = 0.0,
     val deliveryFee: Double = 25.0,
     val discount: Double = 0.0,

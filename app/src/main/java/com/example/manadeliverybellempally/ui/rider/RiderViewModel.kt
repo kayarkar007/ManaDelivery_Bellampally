@@ -74,4 +74,10 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
             vehicleModel = vehicleModel
         )
     }
+
+    fun pingLocation(orderId: String, lat: Double, lng: Double) {
+        viewModelScope.launch {
+            repository.updateOrderRiderLocation(orderId, lat, lng)
+        }
+    }
 }

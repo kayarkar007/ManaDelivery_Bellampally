@@ -106,6 +106,69 @@ fun OrderTrackingScreen(
                     }
                 }
 
+                if (order.status == "OUT_FOR_DELIVERY" || order.status == "READY_FOR_PICKUP") {
+                    item {
+                        Text("LIVE TRACKING", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = ManaBgCard,
+                            border = BorderStroke(1.dp, ManaBorder)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                // Map Grid Background
+                                Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+                                    repeat(5) { HorizontalDivider(color = ManaBorder.copy(alpha = 0.5f)) }
+                                }
+                                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                    repeat(5) { Divider(color = ManaBorder.copy(alpha = 0.5f), modifier = Modifier.width(1.dp).fillMaxHeight()) }
+                                }
+                                
+                                // Route Line
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .width(4.dp)
+                                        .height(100.dp),
+                                    color = ManaGold.copy(alpha = 0.5f)
+                                ) {}
+
+                                // Destination Marker
+                                Icon(
+                                    Icons.Rounded.LocationOn,
+                                    contentDescription = "Destination",
+                                    tint = ManaRedStrong,
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 32.dp)
+                                        .size(32.dp)
+                                )
+
+                                // Rider Marker (Simulated live location)
+                                val animateY by androidx.compose.animation.core.animateFloatAsState(
+                                    targetValue = if (order.riderLocationLat > 0.0) 0f else 1f, // Just a simple mock animation state
+                                    animationSpec = androidx.compose.animation.core.tween(1000)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 32.dp)
+                                ) {
+                                    Surface(
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        color = ManaGold,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(Icons.Rounded.DirectionsBike, contentDescription = "Rider", tint = ManaBgPrimary, modifier = Modifier.padding(8.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (order.deliveryOtp.isNotEmpty() && order.status != "DELIVERED") {
                     item {
                         Surface(

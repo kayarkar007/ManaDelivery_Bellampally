@@ -415,6 +415,38 @@ class FirestoreRepository {
         }
     }
 
+    suspend fun processPayment(orderId: String, method: String): Result<Unit> {
+        return try {
+            db.collection("orders").document(orderId)
+                .update(
+                    mapOf(
+                        "paymentMethod" to method,
+                        "paymentStatus" to "PAID",
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateOrderRiderLocation(orderId: String, lat: Double, lng: Double): Result<Unit> {
+        return try {
+            db.collection("orders").document(orderId)
+                .update(
+                    mapOf(
+                        "riderLocationLat" to lat,
+                        "riderLocationLng" to lng,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                ).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // ═══════════════════════════════════════════
     // RIDER & FINANCE
     // ═══════════════════════════════════════════

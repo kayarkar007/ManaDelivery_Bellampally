@@ -20,6 +20,7 @@ import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,9 @@ fun CheckoutScreen(
     var showAddressPicker by remember { mutableStateOf(false) }
     var couponCode by remember { mutableStateOf("") }
     var showSavedAddresses by remember { mutableStateOf(false) }
+    
+    var selectedPaymentMethod by remember { mutableStateOf("UPI") }
+    var showMockPaymentGateway by remember { mutableStateOf(false) }
     
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -84,9 +88,13 @@ fun CheckoutScreen(
                     .safeDrawingPadding()
             ) {
                 ManaGradientButton(
-                    text = if (isLoading) "PLACING ORDER..." else "PLACE ORDER • ₹${total.toInt()}",
+                    text = if (isLoading) "PLACING ORDER..." else "PAY ₹${total.toInt()} & PLACE ORDER",
                     onClick = {
-                        viewModel.placeOrder("COD", address + (if (landmark.isNotEmpty()) ", Landmark: $landmark" else ""))
+                        if (selectedPaymentMethod == "UPI") {
+                            showMockPaymentGateway = true
+                        } else {
+                            viewModel.placeOrder("COD", address + (if (landmark.isNotEmpty()) ", Landmark: $landmark" else ""))
+                        }
                     },
                     icon = Icons.Rounded.CheckCircle,
                     modifier = Modifier.fillMaxWidth(),
@@ -97,6 +105,34 @@ fun CheckoutScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = ManaBgPrimary
     ) { padding ->
+        
+        if (showMockPaymentGateway) {
+            AlertDialog(
+                onDismissRequest = { showMockPaymentGateway = false },
+                title = { Text("Mock Razorpay PG", fontWeight = FontWeight.Bold, color = ManaTextPrimary) },
+                text = { Text("Simulate a successful UPI payment of ₹${total.toInt()}?", color = ManaTextSecondary) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showMockPaymentGateway = false
+                            viewModel.placeOrder("UPI", address + (if (landmark.isNotEmpty()) ", Landmark: $landmark" else ""))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ManaGold)
+                    ) {
+                        Text("Pay Success")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { 
+                        showMockPaymentGateway = false
+                        scope.launch { snackbarHostState.showSnackbar("Payment Failed") }
+                    }) {
+                        Text("Simulate Failure", color = ManaRedStrong)
+                    }
+                },
+                containerColor = ManaBgCard
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -289,6 +325,37 @@ fun CheckoutScreen(
                             unfocusedContainerColor = ManaBgCard
                         )
                     )
+                }
+            }
+
+            item {
+                Spacer(Modifier.height(8.dp))
+                SectionHeader(title = "Payment Method", subtitle = "How would you like to pay?")
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ManaCard(
+                        modifier = Modifier.weight(1f),
+                        onClick = { selectedPaymentMethod = "UPI" },
+                        border = BorderStroke(2.dp, if (selectedPaymentMethod == "UPI") ManaGold else Color.Transparent),
+                        containerColor = if (selectedPaymentMethod == "UPI") ManaGold.copy(alpha = 0.1f) else ManaBgCard
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                            Text("UPI / Cards", fontWeight = FontWeight.Bold, color = ManaTextPrimary)
+                            Text("Pay Online", style = MaterialTheme.typography.labelSmall, color = ManaSuccess)
+                        }
+                    }
+                    
+                    ManaCard(
+                        modifier = Modifier.weight(1f),
+                        onClick = { selectedPaymentMethod = "COD" },
+                        border = BorderStroke(2.dp, if (selectedPaymentMethod == "COD") ManaGold else Color.Transparent),
+                        containerColor = if (selectedPaymentMethod == "COD") ManaGold.copy(alpha = 0.1f) else ManaBgCard
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                            Text("Cash on Delivery", fontWeight = FontWeight.Bold, color = ManaTextPrimary)
+                            Text("Pay at door", style = MaterialTheme.typography.labelSmall, color = ManaTextSecondary)
+                        }
+                    }
                 }
             }
             

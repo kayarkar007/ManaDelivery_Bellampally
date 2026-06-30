@@ -15,12 +15,12 @@ object SeedData {
 
     private suspend fun seedCategories(db: FirebaseFirestore) {
         val categories = listOf(
-            Category("cat_grocery", "Groceries", "ShoppingCart", true, 1),
-            Category("cat_food", "Restaurants", "Restaurant", true, 2),
-            Category("cat_biryani", "Biryani", "DinnerDining", true, 3),
-            Category("cat_chicken", "Meat & Fish", "SetMeal", true, 4),
-            Category("cat_medicine", "Pharmacy", "LocalPharmacy", true, 5),
-            Category("cat_vegetables", "Vegetables", "Eco", true, 6),
+            Category(id = "cat_grocery", name = "Groceries", icon = "ShoppingCart", isActive = true, sortOrder = 1),
+            Category(id = "cat_food", name = "Restaurants", icon = "Restaurant", isActive = true, sortOrder = 2),
+            Category(id = "cat_biryani", name = "Biryani", icon = "DinnerDining", isActive = true, sortOrder = 3),
+            Category(id = "cat_chicken", name = "Meat & Fish", icon = "SetMeal", isActive = true, sortOrder = 4),
+            Category(id = "cat_medicine", name = "Pharmacy", icon = "LocalPharmacy", isActive = true, sortOrder = 5),
+            Category(id = "cat_vegetables", name = "Vegetables", icon = "Eco", isActive = true, sortOrder = 6),
         )
         val batch = db.batch()
         categories.forEach { batch.set(db.collection("categories").document(it.id), it) }
@@ -62,14 +62,14 @@ object SeedData {
         )
 
         val products = listOf(
-            Product("p1", "v1", "Rice (5kg)", "Sona Masoori", 350.0, 320.0, "bag", "", true, true),
-            Product("p2", "v1", "Sugar (1kg)", "Pure white", 50.0, 0.0, "kg", "", true, true),
-            Product("p3", "v2", "Idli (4pcs)", "Soft & hot", 40.0, 0.0, "plate", "", true, true),
-            Product("p4", "v2", "Masala Dosa", "Crispy", 60.0, 55.0, "plate", "", true, true),
-            Product("p5", "v3", "Chicken Biryani", "Single portion", 180.0, 160.0, "plate", "", true, false),
-            Product("p6", "v3", "Family Biryani", "Serves 3-4", 450.0, 420.0, "pack", "", true, false),
-            Product("p7", "v4", "Fresh Chicken (1kg)", "With skin", 240.0, 220.0, "kg", "", true, false),
-            Product("p8", "v5", "Dolo 650", "Strip of 15", 30.0, 0.0, "strip", "", true, true)
+            Product(id = "p1", vendorId = "v1", name = "Rice (5kg)", description = "Sona Masoori", price = 350.0, discountPrice = 320.0, unit = "bag", isAvailable = true, isVeg = true),
+            Product(id = "p2", vendorId = "v1", name = "Sugar (1kg)", description = "Pure white", price = 50.0, discountPrice = 0.0, unit = "kg", isAvailable = true, isVeg = true),
+            Product(id = "p3", vendorId = "v2", name = "Idli (4pcs)", description = "Soft & hot", price = 40.0, discountPrice = 0.0, unit = "plate", isAvailable = true, isVeg = true),
+            Product(id = "p4", vendorId = "v2", name = "Masala Dosa", description = "Crispy", price = 60.0, discountPrice = 55.0, unit = "plate", isAvailable = true, isVeg = true),
+            Product(id = "p5", vendorId = "v3", name = "Chicken Biryani", description = "Single portion", price = 180.0, discountPrice = 160.0, unit = "plate", isAvailable = true, isVeg = false),
+            Product(id = "p6", vendorId = "v3", name = "Family Biryani", description = "Serves 3-4", price = 450.0, discountPrice = 420.0, unit = "pack", isAvailable = true, isVeg = false),
+            Product(id = "p7", vendorId = "v4", name = "Fresh Chicken (1kg)", description = "With skin", price = 240.0, discountPrice = 220.0, unit = "kg", isAvailable = true, isVeg = false),
+            Product(id = "p8", vendorId = "v5", name = "Dolo 650", description = "Strip of 15", price = 30.0, discountPrice = 0.0, unit = "strip", isAvailable = true, isVeg = true)
         )
 
         val batch = db.batch()

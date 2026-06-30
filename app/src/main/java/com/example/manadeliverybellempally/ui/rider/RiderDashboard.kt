@@ -1,5 +1,7 @@
 package com.example.manadeliverybellempally.ui.rider
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +28,7 @@ import kotlin.random.Random
 import com.example.manadeliverybellempally.data.model.*
 import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -217,14 +220,72 @@ private fun ActiveTaskCard(
 
     ManaCard(modifier = Modifier.fillMaxWidth()) {
         Column {
-            Text("ORDER #${order.id.takeLast(5).uppercase()}", fontWeight = FontWeight.Bold, color = ManaGold)
-            Text(order.vendorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
-            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ManaBorder)
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    Text("ORDER #${order.id.takeLast(5).uppercase()}", fontWeight = FontWeight.Bold, color = ManaGold)
+                    Text(order.vendorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+                }
+                OrderStatusChip(order.status)
+            }
+
+            // Customer & delivery info
+            if (order.customerName.isNotEmpty() || order.userName.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text("Customer: ${order.customerName.ifEmpty { order.userName }}", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+            }
+            if (order.deliveryAddress.isNotEmpty()) {
+                Text("📍 ${order.deliveryAddress}", style = MaterialTheme.typography.bodySmall, color = ManaTextTertiary, maxLines = 1)
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = ManaBorder)
+
+            // Call buttons
+            val context = LocalContext.current
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val vendorPhone = order.userPhone // vendor phone from order
+                val customerPhone = order.customerPhone.ifEmpty { order.userPhone }
+                OutlinedButton(
+                    onClick = {
+                        if (customerPhone.isNotEmpty()) {
+                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$customerPhone")))
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Call, null, tint = ManaSuccess, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Call Customer", style = MaterialTheme.typography.labelSmall, color = ManaSuccess)
+                }
+                OutlinedButton(
+                    onClick = {
+                        // Navigate to vendor location via Google Maps
+                        val uri = Uri.parse("google.navigation:q=${order.deliveryAddress}")
+                        val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+                        mapIntent.setPackage("com.google.android.apps.maps")
+                        context.startActivity(mapIntent)
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Navigation, null, tint = ManaGold, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Navigate", style = MaterialTheme.typography.labelSmall, color = ManaGold)
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
             
             val nextStatus = when(order.status) {
                 "ACCEPTED" -> "OUT_FOR_DELIVERY"
-                "READY_FOR_PICKUP" -> "OUT_FOR_DELIVERY"
+                "READY" -> "OUT_FOR_DELIVERY"
                 "OUT_FOR_DELIVERY" -> "DELIVERED"
+                else -> ""
+            }
+
+            val buttonLabel = when(nextStatus) {
+                "OUT_FOR_DELIVERY" -> "📦 PICKED UP — START DELIVERY"
+                "DELIVERED" -> "✅ MARK AS DELIVERED"
                 else -> ""
             }
             
@@ -232,10 +293,10 @@ private fun ActiveTaskCard(
                 Button(
                     onClick = { onStatusUpdate(nextStatus) },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (nextStatus == "DELIVERED") ManaSuccess else ManaGold),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("MARK AS $nextStatus", color = Color.Black, fontWeight = FontWeight.Black)
+                    Text(buttonLabel, color = if (nextStatus == "DELIVERED") Color.White else Color.Black, fontWeight = FontWeight.Black)
                 }
             }
         }

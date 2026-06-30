@@ -142,6 +142,7 @@ data class Category(
     val id: String = "",
     val name: String = "",
     val icon: String = "",
+    val imageUrl: String = "",
     @get:PropertyName("isActive") @set:PropertyName("isActive") var isActive: Boolean = true,
     val sortOrder: Int = 0,
 )
@@ -153,7 +154,8 @@ data class Vendor(
     val phone: String = "",
     val rating: Double = 4.0,
     val categoryId: String = "",
-    val categoryName: String = "", // Added for compat
+    val categoryName: String = "",
+    val imageUrl: String = "",
     @get:PropertyName("isStoreOpen") @set:PropertyName("isStoreOpen") var isStoreOpen: Boolean = true,
     @get:PropertyName("isBusy") @set:PropertyName("isBusy") var isBusy: Boolean = false,
     val lat: Double = 0.0,
@@ -175,11 +177,12 @@ data class WalletTransaction(
 data class Product(
     val id: String = "",
     val vendorId: String = "",
+    val vendorName: String = "",
     val name: String = "",
     val description: String = "",
     val price: Double = 0.0,
-    val discountPrice: Double = 0.0, // Added for compat
-    val unit: String = "pcs", // Added for compat
+    val discountPrice: Double = 0.0,
+    val unit: String = "pcs",
     val imageUrl: String = "",
     @get:PropertyName("isAvailable") @set:PropertyName("isAvailable") var isAvailable: Boolean = true,
     @get:PropertyName("isVeg") @set:PropertyName("isVeg") var isVeg: Boolean = true,

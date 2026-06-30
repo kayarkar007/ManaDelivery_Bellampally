@@ -14,8 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.example.manadeliverybellempally.data.model.*
 import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
@@ -127,14 +129,15 @@ fun VendorStoreScreen(
                     )
                 }
             } else {
-                items(products) { product ->
+                items(products, key = { it.id }) { product ->
                     ProductCard(
                         name = product.name,
                         price = product.price,
                         discountPrice = product.discountPrice,
                         unit = product.unit,
                         isVeg = product.isVeg,
-                        rating = 4.0f,
+                        rating = product.rating.toFloat(),
+                        imageUrl = product.imageUrl,
                         quantity = cart[product.id] ?: 0,
                         onAdd = { viewModel.addToCart(product) },
                         onRemove = { viewModel.removeFromCart(product) },
@@ -155,7 +158,16 @@ private fun VendorDetailHeader(vendor: Vendor?) {
                     modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(ManaRedStrong),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(vendor?.storeName?.take(1) ?: "V", color = ManaGold, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                    if (!vendor?.imageUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = vendor?.imageUrl,
+                            contentDescription = vendor?.storeName,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(vendor?.storeName?.take(1) ?: "V", color = ManaGold, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
+                    }
                 }
                 Spacer(Modifier.width(16.dp))
                 Column {

@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.manadeliverybellempally.theme.*
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun ManaButton(
@@ -173,6 +175,7 @@ fun VendorCard(
     deliveryTime: Int,
     isOpen: Boolean,
     isBusy: Boolean = false,
+    imageUrl: String = "",
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -185,12 +188,25 @@ fun VendorCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Brush.verticalGradient(listOf(ManaRedStrong, ManaRed.copy(alpha = 0.8f)))),
+                    .clip(RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Storefront, null, modifier = Modifier.size(80.dp).alpha(0.1f), tint = ManaGold)
-                Text(storeName.take(1).uppercase(), style = MaterialTheme.typography.displayLarge, color = ManaGold.copy(alpha = 0.15f), fontWeight = FontWeight.Black)
+                if (imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = storeName,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(ManaRedStrong, ManaRed.copy(alpha = 0.8f)))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Storefront, null, modifier = Modifier.size(80.dp).alpha(0.1f), tint = ManaGold)
+                        Text(storeName.take(1).uppercase(), style = MaterialTheme.typography.displayLarge, color = ManaGold.copy(alpha = 0.15f), fontWeight = FontWeight.Black)
+                    }
+                }
                 
                 if (isBusy && isOpen) {
                     Surface(color = ManaWarning.copy(alpha = 0.9f), shape = RoundedCornerShape(8.dp), modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)) {
@@ -242,6 +258,8 @@ fun ProductCard(
     unit: String,
     isVeg: Boolean,
     rating: Float,
+    imageUrl: String = "",
+    vendorName: String = "Local Special",
     quantity: Int = 0,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
@@ -250,13 +268,22 @@ fun ProductCard(
     ManaCard(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Box(modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(ManaBgSecondary), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Fastfood, null, tint = ManaGold.copy(alpha = 0.2f), modifier = Modifier.size(40.dp))
+                if (imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Rounded.Fastfood, null, tint = ManaGold.copy(alpha = 0.2f), modifier = Modifier.size(40.dp))
+                }
                 Icon(imageVector = Icons.Rounded.FiberManualRecord, contentDescription = null, tint = if (isVeg) ManaSuccess else ManaRed, modifier = Modifier.size(16.dp).align(Alignment.TopStart).padding(4.dp).border(1.dp, Color.White, CircleShape))
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(name, style = MaterialTheme.typography.titleMedium, color = ManaTextPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Local Special", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                Text(vendorName, style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val finalPrice = if (discountPrice > 0) discountPrice else price

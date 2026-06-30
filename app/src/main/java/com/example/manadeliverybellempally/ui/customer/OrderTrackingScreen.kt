@@ -1,33 +1,25 @@
 package com.example.manadeliverybellempally.ui.customer
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.manadeliverybellempally.data.model.*
 import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlinx.coroutines.delay
-import androidx.compose.runtime.*
-import com.google.maps.android.compose.*
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.example.manadeliverybellempally.data.model.Order
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,298 +27,197 @@ fun OrderTrackingScreen(
     orderId: String,
     viewModel: CustomerViewModel,
     onBack: () -> Unit,
-    onSupportClick: (String) -> Unit = {}
+    onSupportClick: (String) -> Unit
 ) {
     val orders by viewModel.orders.collectAsState()
     val order = orders.find { it.id == orderId }
     val isLoading by viewModel.isLoading.collectAsState()
 
-    var showCancelDialog by remember { mutableStateOf(false) }
-    var cancelReason by remember { mutableStateOf("") }
-    var rating by remember { mutableStateOf(5) }
+    var rating by remember { mutableFloatStateOf(5f) }
     var reviewComment by remember { mutableStateOf("") }
-    
-    // Live timer for cancellation window and ETA
-    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            currentTime = System.currentTimeMillis()
-            delay(1000)
-        }
-    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Track Order", color = ManaTextPrimary, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = ManaBgPrimary)
+            ManaHeader(
+                title = "Track Order",
+                subtitle = "Status: ${order?.status ?: "Unknown"}",
+                showBackButton = true,
+                onBack = onBack
             )
         },
         containerColor = ManaBgPrimary
     ) { padding ->
         if (order == null) {
-            EmptyState(icon = Icons.Rounded.Search, title = "Order not found", subtitle = "We couldn't retrieve the details for this order.")
+            EmptyState(icon = Icons.Rounded.Search, title = "Order Not Found", subtitle = "Could not find order details.")
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    ManaCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column {
-                                Text("CURRENT STATUS", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
-                                Text(order.status.replace("_", " "), style = MaterialTheme.typography.headlineSmall, color = ManaGold, fontWeight = FontWeight.Black)
-                            }
-                            OrderStatusChip(status = order.status)
-                        }
-                        
-                        // ETA calculation
-                        if (order.status != "DELIVERED" && order.status != "CANCELLED") {
-                            val elapsedMinutes = (currentTime - order.createdAt) / (60 * 1000)
-                            val remainingMinutes = (order.estimatedDeliveryMinutes - elapsedMinutes).coerceAtLeast(0)
-                            
-                            Spacer(Modifier.height(16.dp))
-                            Divider(color = ManaBorder.copy(alpha = 0.5f))
-                            Spacer(Modifier.height(16.dp))
-                            
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Timer, contentDescription = null, tint = ManaGold)
-                                Spacer(Modifier.width(12.dp))
-                                Column {
-                                    Text("Estimated Arrival", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
-                                    if (remainingMinutes > 0) {
-                                        Text("$remainingMinutes mins", style = MaterialTheme.typography.titleMedium, color = ManaTextPrimary, fontWeight = FontWeight.Bold)
-                                    } else {
-                                        Text("Arriving any moment", style = MaterialTheme.typography.titleMedium, color = ManaSuccess, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (order.status == "OUT_FOR_DELIVERY" || order.status == "READY_FOR_PICKUP") {
-                    item {
-                        Text("LIVE TRACKING", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(250.dp),
-                            shape = RoundedCornerShape(20.dp),
-                            color = ManaBgCard,
-                            border = BorderStroke(1.dp, ManaBorder)
-                        ) {
-                            // If Rider location is not yet synced, default to Bellempally
-                            val riderLat = if (order.riderLocationLat != 0.0) order.riderLocationLat else 19.0560
-                            val riderLng = if (order.riderLocationLng != 0.0) order.riderLocationLng else 79.4851
-                            val riderLatLng = LatLng(riderLat, riderLng)
-                            
-                            val cameraPositionState = rememberCameraPositionState {
-                                position = CameraPosition.fromLatLngZoom(riderLatLng, 15f)
-                            }
-                            
-                            // Follow the rider when their location changes
-                            LaunchedEffect(riderLatLng) {
-                                cameraPositionState.position = CameraPosition.fromLatLngZoom(riderLatLng, 15f)
-                            }
-
-                            GoogleMap(
-                                modifier = Modifier.fillMaxSize(),
-                                cameraPositionState = cameraPositionState,
-                                properties = MapProperties(isMyLocationEnabled = false)
-                            ) {
-                                Marker(
-                                    state = MarkerState(position = riderLatLng),
-                                    title = order.riderName.ifEmpty { "Rider" },
-                                    snippet = "Your order is on the way!",
-                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)
-                                )
-                                // Delivery Address Marker
-                                if (order.deliveryAddressObj?.lat != null && order.deliveryAddressObj?.lat != 0.0) {
-                                    Marker(
-                                        state = MarkerState(position = LatLng(order.deliveryAddressObj.lat, order.deliveryAddressObj.lng)),
-                                        title = "Delivery Location",
-                                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (order.deliveryOtp.isNotEmpty() && order.status != "DELIVERED") {
-                    item {
-                        Surface(
-                            color = ManaGold.copy(alpha = 0.05f),
-                            shape = RoundedCornerShape(20.dp),
-                            border = BorderStroke(1.dp, ManaGold.copy(alpha = 0.2f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("DELIVERY OTP", style = MaterialTheme.typography.labelSmall, color = ManaGold, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                                Spacer(Modifier.height(8.dp))
-                                Text(order.deliveryOtp, style = MaterialTheme.typography.displayMedium, color = ManaGold, fontWeight = FontWeight.Black, letterSpacing = 12.sp)
-                                Spacer(Modifier.height(8.dp))
-                                Text("Share this with the rider only at your doorstep", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
-                            }
-                        }
-                    }
+                    OrderOverviewCard(order)
                 }
 
                 item {
-                    Text("TIMELINE", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
-                    ManaCard(modifier = Modifier.fillMaxWidth()) {
-                        val timeline = order.statusTimeline.toList().sortedByDescending { it.second }
-                        timeline.forEachIndexed { index, (status, time) ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                                Row(Modifier.weight(1f)) {
-                                    Icon(
-                                        imageVector = if (index == 0) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
-                                        contentDescription = null,
-                                        tint = if (index == 0) ManaSuccess else ManaTextTertiary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    Column {
-                                        Text(status.replace("_", " "), style = MaterialTheme.typography.bodyMedium, color = if(index == 0) ManaTextPrimary else ManaTextSecondary, fontWeight = if(index == 0) FontWeight.Bold else FontWeight.Normal)
-                                        Text(SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(time)), style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
-                                    }
-                                }
-                            }
-                            if (index < timeline.size - 1) {
-                                HorizontalDivider(color = ManaBorder.copy(alpha = 0.3f), modifier = Modifier.padding(start = 32.dp))
-                            }
-                        }
-                    }
+                    StatusTimeline(order)
                 }
 
-                // Action Buttons / Sections
-                item {
-                    // Cancel Window
-                    if (order.status == "PLACED" && (currentTime - order.createdAt) < Order.CANCEL_WINDOW_MS) {
-                        val secondsLeft = (Order.CANCEL_WINDOW_MS - (currentTime - order.createdAt)) / 1000
-                        Button(
-                            onClick = { showCancelDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = ManaRedStrong)
-                        ) {
-                            Text("Cancel Order (0:${secondsLeft.toString().padStart(2, '0')})")
-                        }
-                    }
-                    
-                    // Reorder
-                    if (order.status == "DELIVERED" || order.status == "CANCELLED") {
-                        ManaGradientButton(
-                            text = "Reorder",
-                            icon = Icons.Rounded.Refresh,
-                            onClick = {
-                                viewModel.reorder(order.id)
-                                onBack() // Send user back to cart/checkout flow
-                            },
-                            modifier = Modifier.fillMaxWidth(),
+                if (order.status == "DELIVERED") {
+                    item {
+                        ReviewCard(
+                            rating = rating,
+                            onRatingChange = { rating = it },
+                            comment = reviewComment,
+                            onCommentChange = { reviewComment = it },
+                            onSubmit = { viewModel.submitReview(order.id, order.vendorId, rating.toInt(), reviewComment) },
                             isLoading = isLoading
                         )
                     }
-                    
-                    // Ratings & Reviews
-                    if (order.status == "DELIVERED" && !order.isReviewed) {
-                        Spacer(Modifier.height(16.dp))
-                        SectionHeader(title = "Rate your experience", subtitle = "Help us improve")
-                        ManaCard(modifier = Modifier.fillMaxWidth()) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                                Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                                    (1..5).forEach { i ->
-                                        IconButton(onClick = { rating = i }) {
-                                            Icon(
-                                                imageVector = if (i <= rating) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                                                contentDescription = null,
-                                                tint = ManaGold,
-                                                modifier = Modifier.size(36.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                                OutlinedTextField(
-                                    value = reviewComment,
-                                    onValueChange = { reviewComment = it },
-                                    placeholder = { Text("Write a review (optional)") },
-                                    modifier = Modifier.fillMaxWidth().height(100.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold)
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                Button(
-                                    onClick = { viewModel.submitReview(order.id, order.vendorId, rating, reviewComment) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold, contentColor = ManaBgPrimary),
-                                    enabled = !isLoading
-                                ) {
-                                    Text("Submit Review")
-                                }
-                            }
-                        }
-                    }
+                }
 
-                    item { Spacer(Modifier.height(16.dp)) }
-
-                    item {
-                        OutlinedButton(
-                            onClick = { onSupportClick(order.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ManaRed),
-                            border = BorderStroke(1.dp, ManaRed.copy(alpha = 0.5f))
-                        ) {
-                            Icon(Icons.Rounded.SupportAgent, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Report Issue with Order")
-                        }
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = { onSupportClick(order.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = ManaRed),
+                        border = BorderStroke(1.dp, ManaRed.copy(alpha = 0.5f))
+                    ) {
+                        Icon(Icons.Rounded.SupportAgent, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Report Issue with Order")
                     }
                 }
                 
-                item { Spacer(Modifier.height(32.dp)) }
+                item { Spacer(Modifier.height(48.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderOverviewCard(order: Order) {
+    ManaCard {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("ORDER ID", style = MaterialTheme.typography.labelSmall, color = ManaGold)
+                OrderStatusChip(order.status)
+            }
+            Text("#${order.id.takeLast(8).uppercase()}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
+            
+            HorizontalDivider(color = ManaBorder)
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Store, null, tint = ManaGold)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Vendor", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                    Text(order.vendorName, fontWeight = FontWeight.Bold)
+                }
             }
             
-            if (showCancelDialog) {
-                AlertDialog(
-                    onDismissRequest = { showCancelDialog = false },
-                    title = { Text("Cancel Order", color = ManaTextPrimary, fontWeight = FontWeight.Bold) },
-                    text = {
-                        Column {
-                            Text("Are you sure you want to cancel this order?", color = ManaTextSecondary)
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = cancelReason,
-                                onValueChange = { cancelReason = it },
-                                placeholder = { Text("Reason for cancellation (optional)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold)
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                viewModel.cancelOrder(order.id, if (cancelReason.isBlank()) "Customer changed mind" else cancelReason)
-                                showCancelDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = ManaRedStrong)
-                        ) {
-                            Text("Confirm Cancel")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showCancelDialog = false }) {
-                            Text("Keep Order", color = ManaTextTertiary)
-                        }
-                    },
-                    containerColor = ManaBgCard
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.LocationOn, null, tint = ManaGold)
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Delivery To", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                    Text(order.deliveryAddress, fontWeight = FontWeight.Bold, maxLines = 2)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusTimeline(order: Order) {
+    val statuses = listOf("PLACED", "CONFIRMED", "PREPARING", "READY", "PICKED_UP", "DELIVERED")
+    val currentIndex = statuses.indexOf(order.status)
+    
+    ManaCard {
+        Column {
+            Text("ORDER PROGRESS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+            Spacer(Modifier.height(16.dp))
+            statuses.forEachIndexed { index, status ->
+                TimelineItem(
+                    status = status,
+                    isCompleted = index <= currentIndex,
+                    isLast = index == statuses.size - 1
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun TimelineItem(status: String, isCompleted: Boolean, isLast: Boolean) {
+    Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(if (isCompleted) ManaSuccess else ManaBorder)
+            )
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .weight(1f)
+                        .background(if (isCompleted) ManaSuccess else ManaBorder)
+                )
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.padding(bottom = if (isLast) 0.dp else 24.dp)) {
+            Text(
+                status.replace("_", " "),
+                fontWeight = if (isCompleted) FontWeight.Black else FontWeight.Normal,
+                color = if (isCompleted) ManaTextPrimary else ManaTextTertiary
+            )
+        }
+    }
+}
+
+@Composable
+fun ReviewCard(
+    rating: Float,
+    onRatingChange: (Float) -> Unit,
+    comment: String,
+    onCommentChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    isLoading: Boolean
+) {
+    ManaCard {
+        Column {
+            Text("RATE YOUR EXPERIENCE", style = MaterialTheme.typography.labelMedium, color = ManaGold)
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                repeat(5) { i ->
+                    val starIndex = i + 1
+                    IconButton(onClick = { onRatingChange(starIndex.toFloat()) }) {
+                        Icon(
+                            imageVector = if (rating >= starIndex) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                            contentDescription = null,
+                            tint = if (rating >= starIndex) ManaGold else ManaBorder,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = comment,
+                onValueChange = onCommentChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("How was the food and delivery?") },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ManaGold)
+            )
+            Spacer(Modifier.height(16.dp))
+            ManaGradientButton(text = "SUBMIT REVIEW", onClick = onSubmit, isLoading = isLoading)
         }
     }
 }

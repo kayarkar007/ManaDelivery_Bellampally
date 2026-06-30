@@ -38,45 +38,74 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private var currentRiderId: String = ""
+
     fun initialize(riderId: String) {
+        if (currentRiderId == riderId && _rider.value != null) return
+        currentRiderId = riderId
+
         viewModelScope.launch {
             _isLoading.value = true
-            _rider.value = User(id = riderId, role = "rider", name = "Test Rider", isOnline = true, vehicleNumber = "TS 00 0000")
-            
-            launch {
-                repository.getRiderOrdersFlow(riderId).collect {
-                    _myOrders.value = it
+            try {
+                // BUG-02 FIX: Load REAL rider data from Firestore instead of hardcoded test data
+                launch {
+                    repository.getUserFlow(riderId).collect {
+                        _rider.value = it
+                    }
                 }
-            }
-            launch {
-                repository.getAvailableDeliveriesFlow().collect {
-                    _availableOrders.value = it
+                launch {
+                    repository.getRiderOrdersFlow(riderId).collect {
+                        _myOrders.value = it
+                    }
                 }
+                launch {
+                    repository.getAvailableDeliveriesFlow().collect {
+                        _availableOrders.value = it
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
             }
-            _isLoading.value = false
         }
     }
 
+    // BUG-06 FIX: Persist duty toggle to Firestore
     fun toggleDuty(isOnline: Boolean) {
-        _rider.value = _rider.value?.copy(isOnline = isOnline)
+        viewModelScope.launch {
+            val result = repository.updateRiderOnlineStatus(currentRiderId, isOnline)
+            if (result.isFailure) {
+                _error.value = "Failed to update duty status"
+            }
+            // Firestore flow will automatically update _rider state
+        }
     }
 
     fun acceptOrder(orderId: String) {
         val r = _rider.value ?: return
         viewModelScope.launch {
-            repository.assignRiderToOrder(orderId, r.id, r.name, r.phone)
+            val result = repository.assignRiderToOrder(orderId, r.id, r.name, r.phone)
+            if (result.isFailure) {
+                _error.value = result.exceptionOrNull()?.message ?: "Failed to accept order"
+            }
         }
     }
 
     fun updateStatus(orderId: String, status: String) {
         viewModelScope.launch {
-            repository.updateOrderStatus(orderId, status)
+            val result = repository.updateOrderStatus(orderId, status)
+            if (result.isFailure) {
+                _error.value = "Failed to update order status"
+            }
         }
     }
 
     // Phase 9: Real-time Location Updates
     fun updateLocation(lat: Double, lng: Double) {
         viewModelScope.launch {
+            // Update rider's own location in their user document
+            repository.updateRiderLocation(currentRiderId, lat, lng)
             // Update location for all active orders for this rider
             val activeOrders = _myOrders.value.filter { it.status == "OUT_FOR_DELIVERY" || it.status == "ACCEPTED" || it.status == "READY" }
             activeOrders.forEach { order ->
@@ -90,12 +119,13 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
     }
 
     fun updateVehicle(vehicleType: String, vehicleNumber: String, vehicleModel: String) {
-        val curr = _rider.value ?: return
-        _rider.value = curr.copy(
-            vehicleType = vehicleType,
-            vehicleNumber = vehicleNumber,
-            vehicleModel = vehicleModel
-        )
+        viewModelScope.launch {
+            val result = repository.updateRiderVehicle(currentRiderId, vehicleType, vehicleNumber, vehicleModel)
+            if (result.isFailure) {
+                _error.value = "Failed to update vehicle info"
+            }
+            // Firestore flow will automatically update _rider state
+        }
     }
 
     fun pingLocation(orderId: String, lat: Double, lng: Double) {
@@ -104,3 +134,4 @@ class RiderViewModel(private val repository: FirestoreRepository = FirestoreRepo
         }
     }
 }
+

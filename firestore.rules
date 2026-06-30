@@ -162,12 +162,15 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════
-    // WALLET TRANSACTIONS — Owner read, admin write
+    // WALLET TRANSACTIONS — Owner read, system creates during order flow
     // ═══════════════════════════════════════════
     match /wallet_transactions/{txnId} {
       allow read: if isSignedIn() && 
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
+      // Allow signed-in users to create transactions (wallet deduction during checkout)
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     // ═══════════════════════════════════════════

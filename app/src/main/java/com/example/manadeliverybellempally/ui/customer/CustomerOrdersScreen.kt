@@ -3,8 +3,10 @@ package com.example.manadeliverybellempally.ui.customer
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -12,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.manadeliverybellempally.theme.*
@@ -26,6 +29,7 @@ import java.util.*
 fun CustomerOrdersScreen(
     viewModel: CustomerViewModel,
     onOrderClick: (String) -> Unit,
+    onVendorClick: (String) -> Unit = {},
     onBack: () -> Unit
 ) {
     val orders by viewModel.orders.collectAsState()
@@ -59,7 +63,7 @@ fun CustomerOrdersScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
-                items(orders.sortedByDescending { it.createdAt }) { order ->
+                items(orders.sortedByDescending { it.createdAt }, key = { it.id }) { order ->
                     val formatter = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
                     val dateStr = formatter.format(Date(order.createdAt))
 
@@ -81,18 +85,50 @@ fun CustomerOrdersScreen(
                         
                         Spacer(Modifier.height(16.dp))
                         Text(order.vendorName, style = MaterialTheme.typography.bodyMedium, color = ManaGold, fontWeight = FontWeight.Bold)
-                        Text("${order.items.size} items • ₹${order.total.toInt()}", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+                        
+                        // Show order items summary
+                        order.items.take(3).forEach { item ->
+                            Text("• ${item.name} × ${item.qty}", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+                        }
+                        if (order.items.size > 3) {
+                            Text("  +${order.items.size - 3} more items", style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                        }
+                        
+                        Text("₹${order.total.toInt()}", style = MaterialTheme.typography.titleMedium, color = ManaTextPrimary, fontWeight = FontWeight.Bold)
                         
                         Spacer(Modifier.height(12.dp))
                         HorizontalDivider(color = ManaBorder.copy(alpha = 0.5f))
                         Spacer(Modifier.height(12.dp))
                         
-                        TextButton(
-                            onClick = { onOrderClick(order.id) },
-                            modifier = Modifier.align(Alignment.End),
-                            colors = ButtonDefaults.textButtonColors(contentColor = ManaGold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("VIEW DETAILS", fontWeight = FontWeight.Bold)
+                            // Re-Order button for delivered/cancelled orders
+                            if (order.status == "DELIVERED" || order.status == "CANCELLED") {
+                                Button(
+                                    onClick = {
+                                        // Navigate to vendor store to re-order
+                                        onVendorClick(order.vendorId)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Re-Order", color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                Spacer(Modifier.width(1.dp))
+                            }
+                            
+                            TextButton(
+                                onClick = { onOrderClick(order.id) },
+                                colors = ButtonDefaults.textButtonColors(contentColor = ManaGold)
+                            ) {
+                                Text("VIEW DETAILS", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -101,3 +137,4 @@ fun CustomerOrdersScreen(
         }
     }
 }
+

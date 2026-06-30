@@ -1,5 +1,7 @@
 package com.example.manadeliverybellempally.ui.vendor
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,12 +18,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.manadeliverybellempally.data.model.*
 import com.example.manadeliverybellempally.theme.*
 import com.example.manadeliverybellempally.ui.common.*
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,9 +43,19 @@ fun VendorDashboardScreen(
     val orders by viewModel.orders.collectAsState()
     val products by viewModel.products.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     LaunchedEffect(vendorId) {
         viewModel.initialize(vendorId)
+    }
+
+    // Show error snackbar
+    error?.let { msg ->
+        LaunchedEffect(msg) {
+            // Auto-clear after showing
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearError()
+        }
     }
 
     Scaffold(
@@ -48,6 +65,15 @@ fun VendorDashboardScreen(
         },
         bottomBar = {
             VendorBottomBar(selectedTab) { selectedTab = it }
+        },
+        snackbarHost = {
+            error?.let {
+                Snackbar(
+                    modifier = Modifier.padding(16.dp),
+                    containerColor = ManaRedStrong,
+                    contentColor = Color.White
+                ) { Text(it) }
+            }
         }
     ) { padding ->
         if (isLoading && vendor == null) {
@@ -84,37 +110,95 @@ private fun VendorTopBar(vendor: Vendor?, onLogout: () -> Unit) {
 
 @Composable
 fun VendorHomeTab(vendor: Vendor?, viewModel: VendorViewModel, orders: List<Order>) {
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
+        }.timeInMillis
+    }
+    val todayOrders = orders.filter { it.createdAt >= todayStart }
+    val deliveredToday = todayOrders.filter { it.status == "DELIVERED" }
+    val todayRevenue = deliveredToday.sumOf { it.total }
+    val pendingOrders = orders.count { it.status == "PLACED" }
+
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             StoreStatusCard(isOpen = vendor?.isStoreOpen ?: false) { viewModel.toggleStoreOpen(!(vendor?.isStoreOpen ?: false)) }
         }
+
+        // New orders alert
+        if (pendingOrders > 0) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = ManaGold.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, ManaGold)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.NotificationsActive, null, tint = ManaGold, modifier = Modifier.size(28.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("$pendingOrders New Order${if (pendingOrders > 1) "s" else ""}!", fontWeight = FontWeight.Bold, color = ManaGold)
+                            Text("Tap Orders tab to accept", style = MaterialTheme.typography.bodySmall, color = ManaTextSecondary)
+                        }
+                    }
+                }
+            }
+        }
         
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(title = "New Orders", value = orders.count { it.status == "PLACED" }.toString(), icon = Icons.Rounded.NotificationsActive, color = ManaGold, modifier = Modifier.weight(1f))
-                StatCard(title = "Preparing", value = orders.count { it.status == "CONFIRMED" || it.status == "PREPARING" }.toString(), icon = Icons.Rounded.Restaurant, color = ManaSuccess, modifier = Modifier.weight(1f))
+                StatCard(title = "Today's Revenue", value = "₹${todayRevenue.toInt()}", icon = Icons.Rounded.CurrencyRupee, color = ManaSuccess, modifier = Modifier.weight(1f))
+                StatCard(title = "Orders Today", value = todayOrders.size.toString(), icon = Icons.Rounded.ShoppingBag, color = ManaGold, modifier = Modifier.weight(1f))
             }
         }
 
         item {
-            Text("QUICK SUMMARY", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatCard(title = "Delivered", value = deliveredToday.size.toString(), icon = Icons.Rounded.CheckCircle, color = ManaSuccess, modifier = Modifier.weight(1f))
+                StatCard(title = "Preparing", value = orders.count { it.status == "CONFIRMED" || it.status == "PREPARING" }.toString(), icon = Icons.Rounded.Restaurant, color = ManaGold, modifier = Modifier.weight(1f))
+            }
+        }
+
+        item {
+            Text("ALL TIME STATS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
         }
         
         item {
             ManaCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Today's Sale", color = ManaTextSecondary)
-                        Text("₹${orders.filter { it.status == "DELIVERED" }.sumOf { it.total }.toInt()}", fontWeight = FontWeight.Bold)
+                        Text("Total Revenue", color = ManaTextSecondary)
+                        Text("₹${orders.filter { it.status == "DELIVERED" }.sumOf { it.total }.toInt()}", fontWeight = FontWeight.Bold, color = ManaSuccess)
+                    }
+                    HorizontalDivider(color = ManaBorder)
+                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Total Orders", color = ManaTextSecondary)
+                        Text("${orders.size}", fontWeight = FontWeight.Bold)
                     }
                     HorizontalDivider(color = ManaBorder)
                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         Text("Completed", color = ManaTextSecondary)
-                        Text("${orders.count { it.status == "DELIVERED" }} Orders", fontWeight = FontWeight.Bold)
+                        Text("${orders.count { it.status == "DELIVERED" }} Orders", fontWeight = FontWeight.Bold, color = ManaSuccess)
+                    }
+                    HorizontalDivider(color = ManaBorder)
+                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Cancelled", color = ManaTextSecondary)
+                        Text("${orders.count { it.status == "CANCELLED" }} Orders", fontWeight = FontWeight.Bold, color = ManaRed)
+                    }
+                    HorizontalDivider(color = ManaBorder)
+                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Average Rating", color = ManaTextSecondary)
+                        Text("⭐ ${String.format("%.1f", vendor?.rating ?: 0.0)}", fontWeight = FontWeight.Bold, color = ManaGold)
                     }
                 }
             }
         }
+
+        item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
@@ -147,32 +231,78 @@ private fun StoreStatusCard(isOpen: Boolean, onToggle: () -> Unit) {
 @Composable
 fun VendorOrdersTab(orders: List<Order>, viewModel: VendorViewModel) {
     val activeOrders = orders.filter { it.status != "DELIVERED" && it.status != "CANCELLED" }
+    val context = LocalContext.current
+
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("ACTIVE ORDERS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp) }
+        item { Text("ACTIVE ORDERS (${activeOrders.size})", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp) }
         
         if (activeOrders.isEmpty()) {
-            item { EmptyState(icon = Icons.AutoMirrored.Rounded.ReceiptLong, title = "No Active Orders", subtitle = "New orders will appear here.") }
+            item { EmptyState(icon = Icons.AutoMirrored.Rounded.ReceiptLong, title = "No Active Orders", subtitle = "New orders will appear here when customers order from your store.") }
         } else {
-            items(activeOrders) { order ->
-                VendorOrderActionCard(order, viewModel)
+            items(activeOrders, key = { it.id }) { order ->
+                VendorOrderActionCard(order, viewModel, context)
             }
         }
     }
 }
 
 @Composable
-private fun VendorOrderActionCard(order: Order, viewModel: VendorViewModel) {
+private fun VendorOrderActionCard(order: Order, viewModel: VendorViewModel, context: android.content.Context) {
+    val dateFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
+
     ManaCard(modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("ID: #${order.id.takeLast(5).uppercase()}", fontWeight = FontWeight.Bold, color = ManaGold)
+                Column {
+                    Text("Order #${order.id.takeLast(5).uppercase()}", fontWeight = FontWeight.Bold, color = ManaGold)
+                    Text(dateFormat.format(Date(order.createdAt)), style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary)
+                }
                 OrderStatusChip(order.status)
             }
             Spacer(Modifier.height(8.dp))
-            order.items.forEach { item ->
-                Text("• ${item.name} x${item.qty}", style = MaterialTheme.typography.bodyMedium)
+
+            // Customer info with call button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(order.customerName.ifEmpty { order.userName }, style = MaterialTheme.typography.bodyMedium, color = ManaTextPrimary)
+                    if (order.deliveryAddress.isNotEmpty()) {
+                        Text(order.deliveryAddress, style = MaterialTheme.typography.labelSmall, color = ManaTextTertiary, maxLines = 1)
+                    }
+                }
+                val phone = order.customerPhone.ifEmpty { order.userPhone }
+                if (phone.isNotEmpty()) {
+                    IconButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.background(ManaSuccess.copy(alpha = 0.1f), CircleShape)
+                    ) {
+                        Icon(Icons.Rounded.Call, "Call Customer", tint = ManaSuccess)
+                    }
+                }
             }
-            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = ManaBorder)
+
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = ManaBorder)
+
+            // Order items
+            order.items.forEach { item ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("${item.name} × ${item.qty}", style = MaterialTheme.typography.bodyMedium, color = ManaTextPrimary)
+                    Text("₹${(item.price * item.qty).toInt()}", style = MaterialTheme.typography.bodyMedium, color = ManaTextSecondary)
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = ManaBorder)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Total", fontWeight = FontWeight.Bold, color = ManaTextPrimary)
+                Text("₹${order.total.toInt()}", fontWeight = FontWeight.Bold, color = ManaGold)
+            }
+
+            Spacer(Modifier.height(12.dp))
             
             when(order.status) {
                 "PLACED" -> {
@@ -189,7 +319,13 @@ private fun VendorOrderActionCard(order: Order, viewModel: VendorViewModel) {
                     }
                 }
                 "READY" -> {
-                    Text("Waiting for Rider to pick up...", color = ManaGold, style = MaterialTheme.typography.labelSmall)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = ManaGold.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("⏳ Waiting for rider to pick up...", modifier = Modifier.padding(12.dp), color = ManaGold, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
         }
@@ -198,25 +334,212 @@ private fun VendorOrderActionCard(order: Order, viewModel: VendorViewModel) {
 
 @Composable
 fun VendorMenuTab(products: List<Product>, viewModel: VendorViewModel) {
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editingProduct by remember { mutableStateOf<Product?>(null) }
+    var deletingProduct by remember { mutableStateOf<Product?>(null) }
+
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("MY ITEMS", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp) }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("MY ITEMS (${products.size})", style = MaterialTheme.typography.labelMedium, color = ManaGold, letterSpacing = 2.sp)
+                Button(
+                    onClick = { showAddDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add Item", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        if (products.isEmpty()) {
+            item {
+                EmptyState(
+                    icon = Icons.Rounded.RestaurantMenu,
+                    title = "No items yet",
+                    subtitle = "Tap '+ Add Item' to create your first product."
+                )
+            }
+        }
         
-        items(products) { product ->
+        items(products, key = { it.id }) { product ->
             ManaCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(product.name, fontWeight = FontWeight.Bold)
-                        Text("₹${product.price.toInt()}", color = ManaGold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(product.name, fontWeight = FontWeight.Bold, color = ManaTextPrimary)
+                            if (product.isVeg) {
+                                Spacer(Modifier.width(8.dp))
+                                Surface(shape = RoundedCornerShape(4.dp), color = ManaSuccess.copy(alpha = 0.1f)) {
+                                    Text("VEG", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = ManaSuccess)
+                                }
+                            }
+                        }
+                        if (product.description.isNotEmpty()) {
+                            Text(product.description, style = MaterialTheme.typography.bodySmall, color = ManaTextTertiary, maxLines = 1)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (product.discountPrice > 0 && product.discountPrice < product.price) {
+                                Text("₹${product.discountPrice.toInt()}", color = ManaGold, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(4.dp))
+                                Text("₹${product.price.toInt()}", color = ManaTextTertiary, style = MaterialTheme.typography.bodySmall, textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                            } else {
+                                Text("₹${product.price.toInt()}", color = ManaGold, fontWeight = FontWeight.Bold)
+                            }
+                            Text(" / ${product.unit}", color = ManaTextTertiary, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Switch(
+                            checked = product.isAvailable, 
+                            onCheckedChange = { viewModel.toggleProductAvailability(product.id, it) }, 
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = ManaSuccess)
+                        )
                         Text(if(product.isAvailable) "Available" else "Sold Out", style = MaterialTheme.typography.labelSmall, color = if(product.isAvailable) ManaSuccess else ManaRed)
-                        Spacer(Modifier.width(8.dp))
-                        Switch(checked = product.isAvailable, onCheckedChange = { viewModel.toggleProductAvailability(product.id, it) }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = ManaSuccess))
+                    }
+                    IconButton(onClick = { editingProduct = product }) {
+                        Icon(Icons.Rounded.Edit, "Edit", tint = ManaTextTertiary, modifier = Modifier.size(20.dp))
+                    }
+                    IconButton(onClick = { deletingProduct = product }) {
+                        Icon(Icons.Rounded.Delete, "Delete", tint = ManaRed, modifier = Modifier.size(20.dp))
                     }
                 }
             }
         }
+
+        item { Spacer(Modifier.height(16.dp)) }
     }
+
+    // Add/Edit Product Dialog
+    if (showAddDialog || editingProduct != null) {
+        val isEdit = editingProduct != null
+        val initial = editingProduct ?: Product()
+        AddProductDialog(
+            initial = initial,
+            isEdit = isEdit,
+            onDismiss = { showAddDialog = false; editingProduct = null },
+            onSave = { product ->
+                if (isEdit) viewModel.addProduct(product) // addProduct does upsert via set()
+                else viewModel.addProduct(product)
+                showAddDialog = false
+                editingProduct = null
+            }
+        )
+    }
+
+    // Delete Confirmation
+    if (deletingProduct != null) {
+        AlertDialog(
+            onDismissRequest = { deletingProduct = null },
+            title = { Text("Delete Product?", color = ManaTextPrimary) },
+            text = { Text("Are you sure you want to delete '${deletingProduct?.name}'? This action cannot be undone.", color = ManaTextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    deletingProduct?.let { viewModel.deleteProduct(it.id) }
+                    deletingProduct = null
+                }) { Text("Delete", color = ManaRedStrong) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingProduct = null }) { Text("Cancel", color = ManaTextSecondary) }
+            },
+            containerColor = ManaBgCard
+        )
+    }
+}
+
+@Composable
+private fun AddProductDialog(
+    initial: Product,
+    isEdit: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (Product) -> Unit
+) {
+    var name by remember { mutableStateOf(initial.name) }
+    var description by remember { mutableStateOf(initial.description) }
+    var price by remember { mutableStateOf(if (initial.price > 0) initial.price.toString() else "") }
+    var discountPrice by remember { mutableStateOf(if (initial.discountPrice > 0) initial.discountPrice.toString() else "") }
+    var unit by remember { mutableStateOf(initial.unit) }
+    var isVeg by remember { mutableStateOf(initial.isVeg) }
+    var prescriptionRequired by remember { mutableStateOf(initial.prescriptionRequired) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isEdit) "Edit Product" else "Add New Product", color = ManaGold, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it },
+                    label = { Text("Product Name *") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                OutlinedTextField(
+                    value = description, onValueChange = { description = it },
+                    label = { Text("Description") }, modifier = Modifier.fillMaxWidth(), maxLines = 2
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = price, onValueChange = { price = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Price (₹) *") }, modifier = Modifier.weight(1f), singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = discountPrice, onValueChange = { discountPrice = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Offer Price") }, modifier = Modifier.weight(1f), singleLine = true
+                    )
+                }
+                OutlinedTextField(
+                    value = unit, onValueChange = { unit = it },
+                    label = { Text("Unit (kg, pcs, plate, litre)") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Vegetarian", color = ManaTextPrimary)
+                    Switch(checked = isVeg, onCheckedChange = { isVeg = it }, colors = SwitchDefaults.colors(checkedTrackColor = ManaSuccess))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Prescription Required", color = ManaTextPrimary)
+                    Switch(checked = prescriptionRequired, onCheckedChange = { prescriptionRequired = it }, colors = SwitchDefaults.colors(checkedTrackColor = ManaGold))
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsedPrice = price.toDoubleOrNull() ?: 0.0
+                    if (name.isNotBlank() && parsedPrice > 0) {
+                        onSave(initial.copy(
+                            name = name.trim(),
+                            description = description.trim(),
+                            price = parsedPrice,
+                            discountPrice = discountPrice.toDoubleOrNull() ?: 0.0,
+                            unit = unit.ifBlank { "pcs" },
+                            isVeg = isVeg,
+                            prescriptionRequired = prescriptionRequired
+                        ))
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = ManaGold),
+                enabled = name.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0
+            ) {
+                Text(if (isEdit) "Update" else "Add Product", color = Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = ManaTextSecondary) }
+        },
+        containerColor = ManaBgCard
+    )
 }
 
 @Composable
@@ -263,7 +586,7 @@ fun VendorReviewsTab(vendor: Vendor?, viewModel: VendorViewModel) {
                 EmptyState(icon = Icons.Rounded.StarBorder, title = "No reviews yet", subtitle = "Deliver great food to earn 5-star ratings!")
             }
         } else {
-            items(reviews) { review ->
+            items(reviews, key = { it.id }) { review ->
                 ManaCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
                         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {

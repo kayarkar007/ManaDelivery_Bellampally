@@ -1,9 +1,16 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.google.services)
 }
+
+// Load API keys from local.properties (NEVER commit this file!)
+val localProps = Properties()
+val localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) { localProps.load(localPropsFile.inputStream()) }
 
 android {
     namespace = "com.example.manadeliverybellempally"
@@ -21,6 +28,10 @@ android {
         buildConfigField("double", "DELIVERY_RADIUS_KM", "10.0")
         buildConfigField("String", "SUPPORT_PHONE", "\"9494378247\"")
         buildConfigField("long", "ORDER_TIMEOUT_MS", "120000L") // 2 minutes
+
+        // API Keys from local.properties
+        buildConfigField("String", "GEMINI_API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "")}\"")
+        buildConfigField("String", "RAZORPAY_KEY_ID", "\"${localProps.getProperty("RAZORPAY_KEY_ID", "")}\"")
     }
 
     buildTypes {
@@ -119,4 +130,7 @@ dependencies {
   
   // Razorpay
   implementation(libs.razorpay.checkout)
+
+  // AI & Semantic Search
+  implementation(libs.generativeai)
 }

@@ -108,8 +108,8 @@ fun CheckoutScreen(
                                 }
                                 
                                 val checkout = Checkout()
-                                // For production, replace with real Razorpay key
-                                checkout.setKeyID("YOUR_RAZORPAY_API_KEY") 
+                                // Key sourced from BuildConfig (set in local.properties)
+                                checkout.setKeyID(com.example.manadeliverybellempally.BuildConfig.RAZORPAY_KEY_ID) 
                                 try {
                                     val options = JSONObject()
                                     options.put("name", "Mana Delivery")

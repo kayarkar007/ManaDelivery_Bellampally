@@ -1,8 +1,12 @@
 package com.example.manadeliverybellempally
 
 import android.app.Activity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -171,6 +175,7 @@ fun MainNavigation() {
                 CustomerOrdersScreen(
                     viewModel = customerViewModel,
                     onOrderClick = { backStack.add(OrderTracking(it)) },
+                    onVendorClick = { backStack.add(VendorStore(it)) },
                     onBack = { backStack.removeLastOrNull() }
                 )
             }
@@ -255,41 +260,41 @@ fun MainNavigation() {
             entry<AdminOrderDetail> { screen ->
                 AdminOrderDetailScreen(
                     orderId = screen.orderId,
-                    viewModel = viewModel(),
+                    viewModel = viewModel<AdminViewModel>(),
                     onBack = { backStack.removeLastOrNull() }
                 )
             }
 
             entry<AdminUserDetail> {
-                AdminUserListScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminUserListScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminVendorDetail> {
-                AdminVendorListScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminVendorListScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminCouponManager> {
-                AdminCouponManagerScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminCouponManagerScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminBannerManager> {
-                AdminBannerManagerScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminBannerManagerScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminGlobalSettings> {
-                AdminSettingsScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminSettingsScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<OrderHistory> {
-                AdminPayoutScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminPayoutScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminReports> {
-                AdminAnalyticsScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminAnalyticsScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminAuditLogs> {
-                AdminAuditLogsScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminAuditLogsScreen(onBack = { backStack.removeLastOrNull() })
             }
 
             entry<AdminBroadcast> {
@@ -297,7 +302,7 @@ fun MainNavigation() {
             }
 
             entry<AdminSupport> {
-                AdminSupportCenterScreen(viewModel = viewModel(), onBack = { backStack.removeLastOrNull() })
+                AdminSupportScreen(viewModel = viewModel<AdminViewModel>(), onBack = { backStack.removeLastOrNull() })
             }
         },
     )

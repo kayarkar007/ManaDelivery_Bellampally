@@ -272,6 +272,7 @@ fun VendorRow(vendors: List<Vendor>, onVendorClick: (String) -> Unit) {
                 deliveryTime = vendor.deliveryTimeMinutes,
                 isOpen = vendor.isStoreOpen,
                 isBusy = vendor.isBusy,
+                imageUrl = vendor.imageUrl,
                 onClick = { onVendorClick(vendor.id) },
                 modifier = Modifier.width(280.dp)
             )
@@ -295,6 +296,8 @@ fun PopularItems(
                 unit = product.unit,
                 isVeg = product.isVeg,
                 rating = product.rating.toFloat(),
+                imageUrl = product.imageUrl,
+                vendorName = product.vendorName.ifEmpty { "Local Special" },
                 quantity = cart[product.id] ?: 0,
                 onAdd = { onAdd(product) },
                 onRemove = { onRemove(product) }
@@ -440,7 +443,16 @@ fun CategoriesGrid(categories: List<Category>, onCategoryClick: (String) -> Unit
                     border = BorderStroke(1.dp, ManaBorder)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(category.name.take(1), fontWeight = FontWeight.Bold, color = ManaGold)
+                        if (category.imageUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = category.imageUrl,
+                                contentDescription = category.name,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(category.name.take(1), fontWeight = FontWeight.Bold, color = ManaGold, style = MaterialTheme.typography.headlineSmall)
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

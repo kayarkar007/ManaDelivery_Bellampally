@@ -342,19 +342,6 @@ class FirestoreRepository {
         awaitClose { listener.remove() }
     }
 
-    suspend fun updateOrderRiderLocation(orderId: String, lat: Double, lng: Double): Result<Unit> {
-        return try {
-            db.collection("orders").document(orderId).update(
-                mapOf(
-                    "riderLocationLat" to lat,
-                    "riderLocationLng" to lng
-                )
-            ).await()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 
     suspend fun assignRiderToOrder(orderId: String, riderId: String, riderName: String, riderPhone: String): Result<Unit> {
         return try {
@@ -653,6 +640,18 @@ class FirestoreRepository {
             val id = db.collection("audit_logs").document().id
             db.collection("audit_logs").document(id).set(action.copy(id = id)).await()
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAuditLogs(): Result<List<AuditLog>> {
+        return try {
+            val snapshot = db.collection("audit_logs")
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(100)
+                .get().await()
+            Result.success(snapshot.toObjects(AuditLog::class.java))
         } catch (e: Exception) {
             Result.failure(e)
         }

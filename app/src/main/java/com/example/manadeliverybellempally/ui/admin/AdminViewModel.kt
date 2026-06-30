@@ -65,23 +65,19 @@ class AdminViewModel(private val repository: FirestoreRepository = FirestoreRepo
                         _revenue.value = orders.filter { it.status == "DELIVERED" }.sumOf { it.total }
                     }
                 }
+                // BUG-14 FIX: Single listener for users, computing ALL derived counts
                 launch {
                     repository.getUsersFlow().collect { users ->
                         _allUsers.value = users
                         _riderCount.value = users.count { it.role == "RIDER" }
                         _activeRidersCount.value = users.count { it.role == "RIDER" && it.isOnline }
+                        _pendingVendorsCount.value = users.count { it.role == "VENDOR" && it.approvalStatus == "PENDING" }
                     }
                 }
                 launch {
                     repository.getVendorsFlow().collect { vendors ->
                         _allVendors.value = vendors
                         _vendorCount.value = vendors.size
-                    }
-                }
-                // Initial counts for pending
-                launch {
-                    repository.getUsersFlow().collect { users ->
-                        _pendingVendorsCount.value = users.count { it.role == "VENDOR" && it.approvalStatus == "PENDING" }
                     }
                 }
                 

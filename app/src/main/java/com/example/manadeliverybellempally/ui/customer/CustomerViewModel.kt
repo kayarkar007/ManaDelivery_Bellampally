@@ -67,13 +67,46 @@ class CustomerViewModel(private val repository: FirestoreRepository = FirestoreR
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    val filteredProducts = combine(_products, _searchQuery) { products, query ->
+    private val _isAiSearchActive = MutableStateFlow(false)
+    val isAiSearchActive: StateFlow<Boolean> = _isAiSearchActive
+
+    private val _isAiSearching = MutableStateFlow(false)
+    val isAiSearching: StateFlow<Boolean> = _isAiSearching
+
+    private val _aiRecommendedProductIds = MutableStateFlow<List<String>>(emptyList())
+    private val aiService = com.example.manadeliverybellempally.data.repository.AiAssistantService()
+
+    val filteredProducts = combine(_products, _searchQuery, _isAiSearchActive, _aiRecommendedProductIds) { products, query, isAi, aiIds ->
         if (query.isBlank()) emptyList()
-        else products.filter { it.name.contains(query, ignoreCase = true) }
+        else if (isAi) {
+            products.filter { it.id in aiIds }
+        } else {
+            products.filter { it.name.contains(query, ignoreCase = true) }
+        }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    fun toggleAiSearch(active: Boolean) {
+        _isAiSearchActive.value = active
+        if (!active) {
+            _aiRecommendedProductIds.value = emptyList()
+        }
+    }
+
+    private var searchJob: kotlinx.coroutines.Job? = null
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
+        
+        if (_isAiSearchActive.value && query.isNotBlank()) {
+            searchJob?.cancel()
+            searchJob = viewModelScope.launch {
+                delay(800) // Debounce
+                _isAiSearching.value = true
+                val ids = aiService.getSemanticRecommendations(query, _vendors.value, _products.value)
+                _aiRecommendedProductIds.value = ids
+                _isAiSearching.value = false
+            }
+        }
     }
 
     fun initialize(customerId: String) {

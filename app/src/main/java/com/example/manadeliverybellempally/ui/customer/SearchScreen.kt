@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +30,8 @@ fun SearchScreen(
     val filteredProducts by viewModel.filteredProducts.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val cart by viewModel.cart.collectAsState()
+    val isAiSearchActive by viewModel.isAiSearchActive.collectAsState()
+    val isAiSearching by viewModel.isAiSearching.collectAsState()
 
     Scaffold(
         topBar = {
@@ -71,7 +74,44 @@ fun SearchScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (searchQuery.isBlank()) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = if (isAiSearchActive) ManaGold else ManaTextTertiary)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Semantic AI Search",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (isAiSearchActive) ManaGold else ManaTextSecondary
+                        )
+                    }
+                    Switch(
+                        checked = isAiSearchActive,
+                        onCheckedChange = { viewModel.toggleAiSearch(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = ManaGold,
+                            checkedTrackColor = ManaGold.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+            }
+
+            if (isAiSearching) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(color = ManaGold)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Gemini is finding the best matches...", color = ManaTextSecondary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            } else if (searchQuery.isBlank()) {
                 item {
                     Text(
                         "DISCOVER CATEGORIES",
@@ -134,7 +174,9 @@ fun SearchScreen(
                         discountPrice = product.discountPrice,
                         unit = product.unit,
                         isVeg = product.isVeg,
-                        rating = 4.0f,
+                        rating = product.rating.toFloat(),
+                        imageUrl = product.imageUrl,
+                        vendorName = product.vendorName.ifEmpty { "Local Special" },
                         quantity = cart[product.id] ?: 0,
                         onAdd = { viewModel.addToCart(product) },
                         onRemove = { viewModel.removeFromCart(product) }
